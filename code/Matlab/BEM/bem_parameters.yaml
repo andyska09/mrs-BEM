@@ -1,0 +1,44 @@
+# General Parameters of the Quad and the Environment
+General:
+  air_density:                  1.204       # kg/m^3
+
+
+# This information is used by the BEMPropeller model
+Propeller:
+  ## Propeller Geometry ##
+  # Radius of the propeller disk
+  radius:                       6.477e-2    # m
+
+  # To be measured at the innermost point
+  pitch:                        21.77       # deg
+
+  # twist = (pitch_outside - pitch_inside)/blade length
+  twist:                        -11.0       # deg/m
+
+  # Use value here
+  chord_inner:                  1.7e-2      # m
+  chord_outer:                  0.7e-2      # m
+
+  # Ratio of area covered by blades
+  solidity:                     0.215       # 1
+
+  # Distance between CoG of blade and hinge
+  distance_cog:                 2.7e-2      # m
+
+  # Number of blades
+  num_blades:                   3           # 1
+
+  # Mass of a _single_ blade
+  mass_blade:                   1.22e-3     # kg
+
+  # Offset of the virtual hinge spring (0.1 should mostly be fine)
+  rel_hinge_offset:             0.1         # 1
+
+
+  ## Aerodynamic Parameters ##
+  # All coefficients can be calculated using the MATLAB script
+  # "Propeller_SysID.m"
+  drag_coefficient:             13.53063    # 1
+  lift_coefficient:             15.20569    # 1
+  hinge_spring_constant:        5.89        # Nm/rad
+

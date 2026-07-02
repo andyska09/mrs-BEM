@@ -1,0 +1,60 @@
+base_type: "bem"  # "none", "fit", "bem"
+dir:
+  train: ""                  # if empty, defaults to "data/[base_type]/train
+  val: ""                    # if empty, defaults to "data/[base_type]/validation
+  test: ""                   # if empty, defaults to "data/[base_type]/test
+  log: "train_logs"
+checkpoint:
+  resume_training: False
+  resume_file: "train_logs/20210131-211328/checkpoints/ckpt-13"
+  save_every_n_epochs: 5
+dataloading:
+  history_len: 20     # history
+  label_len: 1        # history of output (always 1)
+  label_shift: 0      # shift of label w.r.t. end of input window (always 0)
+  sampling_rate: 1
+  use_pos: False
+  use_att: False
+  use_linvel: True
+  use_angvel: True
+  use_motors: True
+  use_base_force: False 
+  use_base_torque: False 
+quadrotor:
+  mass: 0.772  # [kg]
+  inertia: [ 0.0025, 0.0021, 0.0043 ]  # [kg m2]
+network:
+  architecture: "TCN"  # "MLP", "TCN", "RNN"
+  tcn:
+    layers: 2
+    kernel_sizes: [ 7, 5 ]
+    n_filters: [ 32, 32 ]
+    final_mlp_neurons: [20]
+    use_two_heads: True
+  mlp:
+    n_neurons: [ 64, 32, ]
+    use_two_heads: True
+loss:
+  weight_force: 1.0
+  weight_torque: 1.0
+  axis_weight_force: [ 1.0, 1.0, 3.0 ]
+  axis_weight_torque: [ 1.0, 1.0, 1.0 ]
+optim:
+  max_epochs: 1000
+  batch_size: 128
+  init_lr: 1e-3                      # initial learning rate
+  l2_regularization: 0.0
+  scheduler:
+    first_decay_steps: 10000         # perform cosine decay for this number of steps
+    t_mul: 1.5                       # each subsequent decay is longer by this factor
+    m_mul: 0.75                       # the lr jumps to this fraction of the previous learning rate
+    alpha: 0.01                      # the minimum learning rate to be applied
+visualization:
+  generate_plots: True
+  window_size_viz: 1000
+hardware:
+  # num_cpu_workers: {-1: auto, 0: main thread, >0: ...}
+  num_cpu_workers: -1
+  gpu_device: 0
+  max_memory: 1000  # max allocated memory in MB
+
