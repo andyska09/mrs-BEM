@@ -5,7 +5,9 @@
 #include <vector>
 
 #include "motor.h"
+#ifdef _OPENMP
 #include "omp.h"
+#endif
 #include "timeit.h"
 
 /* Class that implements a Quadcopter. All units are in SI units and the

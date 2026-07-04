@@ -24,7 +24,9 @@ Quadcopter::Quadcopter() {
       Eigen::Vector3d(
           std::vector<double>{param.dx, -param.dy, param.dz}.data()),
       true);
+#ifdef _OPENMP
   omp_set_num_threads(motors.size());
+#endif
 }
 
 Quadcopter::~Quadcopter() {}
