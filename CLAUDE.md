@@ -6,7 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 NeuroBEM is a hybrid aerodynamic quadrotor model that augments a first-principle Blade Element Model (BEM) with a neural network that learns the residual forces/torques the BEM cannot predict. Reference: *"NeuroBEM: Hybrid Aerodynamic Quadrotor Model", 2021, L. Bauersfeld et al.* (see `RSS21_Bauersfeld.pdf`).
 
-The actual framework lives in [code/](code/). The repo root also holds working data/output produced by running the pipeline (`bem+nn/`, `processed_data/`, `pdf/`) — these are flight-data CSVs and per-flight visualization PDFs, not source code. [code/README.md](code/README.md) is the authoritative end-to-end tutorial; consult it for the full workflow and per-parameter details.
+The actual framework lives in [code/](code/). The repo root also holds working data/output produced by running the pipeline (`bem+nn/`, `processed_data/`, `pdf/`) — these are flight-data CSVs and per-flight visualization PDFs, not source code. [code/README.md](code/README.md) is the authoritative end-to-end tutorial for the *pipeline*; consult it for the full workflow and per-parameter details.
+
+### Root-level dataset docs
+
+Three root-level files document the released *dataset* (1h15min of flights, distinct from the code tutorial):
+- [Readme.md](Readme.md) — dataset-level README: folder layout (`processed_data/`, `raw_data/`, `pdf/`, `predictions/`, `code/`) and the exact CSV column orders (29 cols for processed data; +12 cols 30–41 for `predictions/` = predicted force/torque + residuals). Drone mass 0.772 kg, diagonal inertia [0.0025, 0.0021, 0.0043]. Note: this README's `predictions/` folder is the dataset-distribution name for the same stage-2 output the pipeline docs call `MODEL/`/`bem+nn/`.
+- [Flights.txt](Flights.txt) — catalog of all 95 flights as MATLAB `dataset = "<timestamp>"` lines, each commented with its trajectory type (circles, lemniscates, linear/vertical oscillations, cpc, random points, satellites, ellipse).
+- [testset.txt](testset.txt) — 13 held-out `<ID>_seg_X` segments defining the manual test hold-out (all from the 02-18 and 02-23 sessions). This is the dataset-level hold-out list; the pipeline's own `testset.txt` consumed by `get_datafiles.bash` lives under [code/Python/data/](code/Python/data/).
 
 ## Architecture: the three-stage pipeline
 
