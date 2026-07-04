@@ -1,5 +1,6 @@
 """Helpers for the NeuroBEM noise / data-quality EDA."""
 from pathlib import Path
+import re
 
 import numpy as np
 import pandas as pd
@@ -28,6 +29,35 @@ def load_largest_segment(flight_id):
     return pd.read_csv(path, header=0, names=COLUMNS)
 
 
+def flight_ids():
+    r = re.compile(r"merged_(.+)_seg_\d+\.csv")
+    return sorted({r.match(p.name).group(1) for p in DATA_DIR.glob("merged_*_seg_*.csv")})
+
+
+def load_flight(flight_id):
+    files = sorted(DATA_DIR.glob(f"merged_{flight_id}_seg_*.csv"))
+    return pd.concat([pd.read_csv(f, header=0, names=COLUMNS) for f in files],
+                     ignore_index=True)
+
+
+def noise_corpus(cache=None):
+    if cache and Path(cache).exists():
+        return pd.read_csv(cache)
+    rows = []
+    for fid in flight_ids():
+        df = load_flight(fid)
+        for c in df.columns:
+            if c == "t":
+                continue
+            x = df[c].to_numpy()
+            rows.append({"flight": fid, "channel": c,
+                         "snr_db": snr_db(x), "noise_std": noise_std(x)})
+    out = pd.DataFrame(rows)
+    if cache:
+        out.to_csv(cache, index=False)
+    return out
+
+
 def integrity_report(df):
     dt = np.diff(df["t"].to_numpy())
     return {
@@ -48,6 +78,11 @@ def snr_db(x, cutoff=25.0):
     x = np.asarray(x, float)
     s = lowpass(x, cutoff)
     return 10 * np.log10(np.var(s) / np.var(x - s))
+
+
+def noise_std(x, cutoff=25.0):
+    r = np.asarray(x, float) - lowpass(x, cutoff)
+    return float(1.4826 * np.median(np.abs(r - np.median(r))))
 
 
 def snr_table(df, cutoff=25.0):
