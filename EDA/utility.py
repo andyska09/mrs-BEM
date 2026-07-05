@@ -40,6 +40,21 @@ def load_flight(flight_id):
                      ignore_index=True)
 
 
+BEM_DIR = DATA_DIR / "bem"
+PRED = ["fx", "fy", "fz", "tx", "ty", "tz"]
+
+
+def bem_flight_ids():
+    r = re.compile(r"bem_(.+)_seg_\d+\.csv")
+    return sorted({r.match(p.name).group(1) for p in BEM_DIR.glob("bem_*_seg_*.csv")})
+
+
+def load_bem_flight(flight_id):
+    files = sorted(BEM_DIR.glob(f"bem_{flight_id}_seg_*.csv"))
+    return pd.concat([pd.read_csv(f, header=None, names=COLUMNS + PRED) for f in files],
+                     ignore_index=True)
+
+
 def noise_corpus(cache=None):
     if cache and Path(cache).exists():
         return pd.read_csv(cache)
