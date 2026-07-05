@@ -53,7 +53,7 @@ double Propeller::_calculateHForce() {
   double H = 0;
 #elif MODEL == 1
   solver->setPropellerState(Omega, vtot, vel[2], K, alpha, mu, v1);
-  double H = solver->integrateHForce();
+  double H = 3.0 * solver->integrateHForce();
 #endif
   hforceRT.stop();
   return H;
