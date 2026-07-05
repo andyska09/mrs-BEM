@@ -59,6 +59,18 @@ Eigen::Vector3d Quadcopter::getForce() {
   return drag + thrust;
 }
 
+std::vector<double> Quadcopter::getDiagnostics() {
+  if (!_valid) _update();
+  std::vector<double> out;
+  for (Motor& m : motors) {
+    Eigen::Vector3d d = m.getDiagnostics();
+    out.push_back(d[0]);
+    out.push_back(d[1]);
+    out.push_back(d[2]);
+  }
+  return out;
+}
+
 bool Quadcopter::setAcceleration(const Eigen::Vector3d acc) {
   this->acc = acc;
   _valid = false;

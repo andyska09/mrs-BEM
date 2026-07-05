@@ -212,6 +212,11 @@ double Propeller::getLongitudinalFlapping() {
   return a1s;
 }
 
+Eigen::Vector3d Propeller::getDiagnostics() {
+  if (!_valid) _update();
+  return Eigen::Vector3d{vind, mu, alpha};
+}
+
 /* Summarize the current propeller data and runtime information on the command
  * line */
 void Propeller::printInfo() {

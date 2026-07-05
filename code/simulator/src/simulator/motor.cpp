@@ -81,6 +81,12 @@ Eigen::Vector3d Motor::getOffset() {
 }
 
 
+Eigen::Vector3d Motor::getDiagnostics() {
+    if (!_valid) _update();
+    return p.getDiagnostics();
+}
+
+
 /* Function to print the motor info. Optionally an integer can be passed to
  * identify which motor information is printed. */
 void Motor::printInfo(const int num) {

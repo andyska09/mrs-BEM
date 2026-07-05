@@ -19,7 +19,7 @@ Simulator::Simulator(const char* infile, const char* outfile) {
   size_t nRow = csv.getNumberOfRows();
 
   Quadcopter quad;
-  std::vector<double> data(nCol + 6, 0);
+  std::vector<double> data(nCol + 18, 0);
 
   Eigen::Vector3d ang_acc;
   Eigen::Vector3d ang_vel;
@@ -32,7 +32,7 @@ Simulator::Simulator(const char* infile, const char* outfile) {
   std::vector<double> omega(4, 0);
   std::vector<double> domega(4, 0);
 
-  csvWriter writer(outfile, nCol + 6);
+  csvWriter writer(outfile, nCol + 18);
 
   Runtime_s rt;
   for (size_t i = 0; i < nRow; ++i) {
@@ -57,6 +57,8 @@ Simulator::Simulator(const char* infile, const char* outfile) {
     torque = frd2flu(quad.getTorque());
     memcpy(data.data() + nCol, force.data(), 3 * sizeof(double));
     memcpy(data.data() + nCol + 3, torque.data(), 3 * sizeof(double));
+    std::vector<double> diag = quad.getDiagnostics();
+    memcpy(data.data() + nCol + 6, diag.data(), 12 * sizeof(double));
     writer.add(data);
     rt.stop();
   }

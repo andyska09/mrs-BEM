@@ -33,6 +33,7 @@ class Propeller {
   double getConing();
   double getLongitudinalFlapping();
   double getLateralFlapping();
+  Eigen::Vector3d getDiagnostics();  // {v_i, mu, alpha_s}
   bool setState(const double Omega, const Eigen::Vector3d velocity,
                 const Eigen::Vector3d att_rate);
   bool setOmega(const double Omega);
