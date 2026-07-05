@@ -2,9 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## My goal, my rules and my story
+
+This repo goal is to recreate the NeuroBEM paper based on its attachements. My current additions are analysis/ which is for me to play around and analyze the data and outputs of the BEM model. Next, i recieved from my supervisor part of the simulator (in folder my_bem/), that is from the same lab as the paper, that implements BEM inside. I dont know what the end goal of my work is, but if would have to guess, it would probably be to improve this work, to make it more accurate dynamics model and also make it faster so it is usable in RL environment, but that is still far off to the future. Now I am trying to piece together what this code means. Right now I am trying to achieve numbers of just BEM from the paper. It seems that correctly predicting torque is the main issue right now. This is just the beginning of very exciting research journey.
+
+### IMPORTANT NOTE TO ALL AI CHATBOTS
+
+When talking to me start the message with "TARS:". When writing answer always keep it concise and information dense. But do not skip important stuff. When I tell you to fuck off or shout and curse at you DO NOT apologize, it wastes tokens, just follow orders. Next when writing code DO NOT write stupid comments and docstrings. Keep the code clean and high quality. When implementing stuff KEEP IT SIMPLE. This important. I do not want to read 1000 lines of diffs, I want to look at the change and know what it does. As one artist said "One good girl is worth a thousand bitches.".
+
+
 ## What this is
 
-NeuroBEM is a hybrid aerodynamic quadrotor model that augments a first-principle Blade Element Model (BEM) with a neural network that learns the residual forces/torques the BEM cannot predict. Reference: *"NeuroBEM: Hybrid Aerodynamic Quadrotor Model", 2021, L. Bauersfeld et al.* (see `RSS21_Bauersfeld.pdf`).
+NeuroBEM is a hybrid aerodynamic quadrotor model that augments a first-principle Blade Element Model (BEM) with a neural network that learns the residual forces/torques the BEM cannot predict. Reference: *"NeuroBEM: Hybrid Aerodynamic Quadrotor Model", 2021, L. Bauersfeld et al.* (see `RSS21_Bauersfeld.pdf`) and ALSO .md file - same name.
 
 The actual framework lives in [code/](code/). The repo root also holds working data/output produced by running the pipeline (`bem+nn/`, `processed_data/`, `pdf/`) — these are flight-data CSVs and per-flight visualization PDFs, not source code. [code/README.md](code/README.md) is the authoritative end-to-end tutorial for the *pipeline*; consult it for the full workflow and per-parameter details.
 
