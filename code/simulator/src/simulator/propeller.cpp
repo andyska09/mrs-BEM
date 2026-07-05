@@ -217,6 +217,14 @@ Eigen::Vector3d Propeller::getDiagnostics() {
   return Eigen::Vector3d{vind, mu, alpha};
 }
 
+void Propeller::setAero(double cl, double cd, double k) {
+  param.cl = cl;
+  param.cd = cd;
+  param.k = k;
+  _valid = false;
+  _validv1 = false;
+}
+
 /* Summarize the current propeller data and runtime information on the command
  * line */
 void Propeller::printInfo() {

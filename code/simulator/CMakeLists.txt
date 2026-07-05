@@ -134,4 +134,7 @@ endif ()
 add_executable(bem-model src/simulator_node.cpp)
 target_link_libraries(bem-model ${LIBRARY_NAME})
 
+add_executable(identify src/identify.cpp)
+target_link_libraries(identify ${LIBRARY_NAME})
+
 message(STATUS "===========   Done!   ==============")

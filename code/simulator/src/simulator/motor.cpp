@@ -87,6 +87,12 @@ Eigen::Vector3d Motor::getDiagnostics() {
 }
 
 
+void Motor::setAero(double cl, double cd, double k) {
+    p.setAero(cl, cd, k);
+    _valid = false;
+}
+
+
 /* Function to print the motor info. Optionally an integer can be passed to
  * identify which motor information is printed. */
 void Motor::printInfo(const int num) {

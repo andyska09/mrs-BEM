@@ -71,6 +71,11 @@ std::vector<double> Quadcopter::getDiagnostics() {
   return out;
 }
 
+void Quadcopter::setAero(double cl, double cd, double k) {
+  for (Motor& m : motors) m.setAero(cl, cd, k);
+  _valid = false;
+}
+
 bool Quadcopter::setAcceleration(const Eigen::Vector3d acc) {
   this->acc = acc;
   _valid = false;

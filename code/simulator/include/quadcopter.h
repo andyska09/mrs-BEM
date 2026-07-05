@@ -31,6 +31,7 @@ class Quadcopter {
   Eigen::Vector3d getDrag();
   Eigen::Vector3d getForce();
   std::vector<double> getDiagnostics();  // per motor: v_i, mu, alpha_s
+  void setAero(double cl, double cd, double k);
   void printInfo(const bool detailed = false);
 
  private:
