@@ -59,6 +59,14 @@ A **rotor model** (first principles) predicts `f_prop`/`τ_prop`; a **neural net
 - **Quadrotor & sim constants** that appear in code: motor first-order dynamics with time constant **τΩ = 33 ms** (`params.h: tau = 0.033`); the closed-loop simulator integrates with a **symplectic Euler** scheme at 1 ms (chosen for energy conservation); platform mass ≈ 0.772 kg with diagonal inertia (the `quadrotor:` block in the YAML).
 - **Data-processing rationale** (stage 2 MATLAB): Vicon pose at 400 Hz and onboard IMU + motor speeds at 1 kHz are asynchronous, so `MergeAndProcessData` fits **cubic splines** to fuse them and differentiates the splines to get low-noise linear velocity / angular acceleration. Time sync (offset + ~2.4% clock skew) is recovered by correlating gyro rates against the spline (the `align_data` subroutine); motor speeds get a 4th-order Butterworth low-pass. Full dataset in the paper: 96 flights / 1.8 M points, split 70/20/10 — matching the train/val/test counts produced by `get_datafiles.bash`.
 
+## Exploratory analysis (`EDA/`, `analysis/`)
+
+A separate Python workspace (added after the pipeline docs above) for data-quality and BEM-baseline analysis. Unlike the pipeline, these scripts read the **committed-locally, gitignored** `processed_data/` directly (repo-root, not `code/ExampleData/`), so they only run where that data is present. Deps: [EDA/requirements.txt](EDA/requirements.txt) (numpy/pandas/scipy/matplotlib/jupyter).
+
+- [EDA/utility.py](EDA/utility.py) — shared loaders + noise metrics. `load_flight`/`load_largest_segment` read `processed_data/merged_*_seg_*.csv` (the 29-column merged order is hard-coded at [utility.py:12](EDA/utility.py#L12)); `load_bem_flight` reads `processed_data/bem/bem_*_seg_*.csv` (headerless, those 29 cols **+ 6 predicted** `fx,fy,fz,tx,ty,tz` at indices 29–34). `FS = 400 Hz`. SNR/noise split signal from noise with a 4th-order **25 Hz Butterworth** low-pass ([utility.py:87-100](EDA/utility.py#L87)); `noise_corpus(cache=…)` builds/caches the per-channel SNR table (`EDA/noise_corpus.csv`, `EDA/pred_snr.csv`).
+- [analysis/phase1_baseline.py](analysis/phase1_baseline.py) — BEM baseline residual RMSE (measured − predicted) over the full set and the `testset.txt` hold-out. Measured force `= mass·acc` (acc already includes gravity), torque `= I·ang_acc + ω×Iω` ([phase1_baseline.py:14](analysis/phase1_baseline.py#L14)). Run: `python3 analysis/phase1_baseline.py` (defaults to `processed_data/bem` + root `testset.txt`).
+- `processed_data/bem/` is the local equivalent of the pipeline's stage-2 `MODEL/`/`bem+nn/` output that these scripts consume. `my_bem/simulator/` is a separate (agilicious-style) C++ model source tree, distinct from `code/simulator/`.
+
 ## Common commands
 
 All paths below are relative to [code/](code/).
@@ -105,4 +113,5 @@ No CLI build/test harness — scripts are run inside MATLAB. Every function is d
 - **Flight-file naming is load-bearing.** All artifacts for one flight share a base ID (typically a timestamp like `2021-02-03-13-43-38`) with different prefixes/suffixes/extensions: `merged_<ID>_seg_X.csv`, `bem_<ID>_seg_X.csv`, `<ID>_traj.csv`, `<ID>.BFL`, etc. Scripts glob on these patterns, so renames break the pipeline.
 - BEM coning/flapping angles use the *linear* lift/drag coefficients (`param.a`/`param.d`); changing the *nonlinear* `param.cl`/`param.cd` will not move those angles. This is intentional (tractability).
 - `Coning.m` is described in the README as fragile/"a hack" (FFT of audio to recover prop RPM) — handle with care.
+- **Two different mass/inertia values are in play — cite the right one.** The C++ simulator uses `mass = 0.752`, `I = [0.00254, 0.00214, 0.00436]` ([params.h:115-118](code/simulator/include/params.h#L115)), and `analysis/phase1_baseline.py` follows it. The dataset `Readme.md` (and the paper-derived numbers earlier in this file) quote `0.772` and `[0.0025, 0.0021, 0.0043]`. Use the simulator values for anything computing forces/torques from `processed_data/bem/`.
 - Gitignored outputs you should not commit: `Python/train_logs/`, `simulator/build/`, `Matlab/tmp/`, `*.trt`, `*.asv`.
