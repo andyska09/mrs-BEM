@@ -24,9 +24,7 @@ Quadcopter::Quadcopter() {
       Eigen::Vector3d(
           std::vector<double>{param.dx, -param.dy, param.dz}.data()),
       true);
-#ifdef _OPENMP
   omp_set_num_threads(motors.size());
-#endif
 }
 
 Quadcopter::~Quadcopter() {}
@@ -57,23 +55,6 @@ Eigen::Vector3d Quadcopter::getDrag() {
 Eigen::Vector3d Quadcopter::getForce() {
   if (!_valid) _update();
   return drag + thrust;
-}
-
-std::vector<double> Quadcopter::getDiagnostics() {
-  if (!_valid) _update();
-  std::vector<double> out;
-  for (Motor& m : motors) {
-    Eigen::Vector3d d = m.getDiagnostics();
-    out.push_back(d[0]);
-    out.push_back(d[1]);
-    out.push_back(d[2]);
-  }
-  return out;
-}
-
-void Quadcopter::setAero(double cl, double cd, double k) {
-  for (Motor& m : motors) m.setAero(cl, cd, k);
-  _valid = false;
 }
 
 bool Quadcopter::setAcceleration(const Eigen::Vector3d acc) {

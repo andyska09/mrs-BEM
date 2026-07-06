@@ -5,9 +5,7 @@
 #include <vector>
 
 #include "motor.h"
-#ifdef _OPENMP
 #include "omp.h"
-#endif
 #include "timeit.h"
 
 /* Class that implements a Quadcopter. All units are in SI units and the
@@ -30,8 +28,6 @@ class Quadcopter {
   Eigen::Vector3d getTorque();
   Eigen::Vector3d getDrag();
   Eigen::Vector3d getForce();
-  std::vector<double> getDiagnostics();  // per motor: v_i, mu, alpha_s
-  void setAero(double cl, double cd, double k);
   void printInfo(const bool detailed = false);
 
  private:

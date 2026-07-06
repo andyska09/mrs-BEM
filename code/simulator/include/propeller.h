@@ -33,7 +33,6 @@ class Propeller {
   double getConing();
   double getLongitudinalFlapping();
   double getLateralFlapping();
-  Eigen::Vector3d getDiagnostics();  // {v_i, mu, alpha_s}
   bool setState(const double Omega, const Eigen::Vector3d velocity,
                 const Eigen::Vector3d att_rate);
   bool setOmega(const double Omega);
@@ -41,7 +40,6 @@ class Propeller {
   bool setAttitudeRate(const Eigen::Vector3d att_rate);
 
   void printInfo();
-  void setAero(double cl, double cd, double k);
 
  private:
   /* FUNCTION DECLARATIONS */
@@ -81,7 +79,7 @@ class Propeller {
   Eigen::Vector3d forceVec = {0, 0, 0};
   Eigen::Vector3d torqueVec = {0, 0, 0};
 
-  Propeller_s param = Propeller_s();
+  static constexpr Propeller_s param = Propeller_s();
   Runtime_s thrustRT, torqueRT, hforceRT, velocityRT;
   GSLHelper* solver = new GSLHelper();
 };

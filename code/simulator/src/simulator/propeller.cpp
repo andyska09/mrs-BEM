@@ -53,7 +53,7 @@ double Propeller::_calculateHForce() {
   double H = 0;
 #elif MODEL == 1
   solver->setPropellerState(Omega, vtot, vel[2], K, alpha, mu, v1);
-  double H = 3.0 * solver->integrateHForce();
+  double H = solver->integrateHForce();
 #endif
   hforceRT.stop();
   return H;
@@ -210,19 +210,6 @@ double Propeller::getLateralFlapping() {
 double Propeller::getLongitudinalFlapping() {
   if (!_valid) _update();
   return a1s;
-}
-
-Eigen::Vector3d Propeller::getDiagnostics() {
-  if (!_valid) _update();
-  return Eigen::Vector3d{vind, mu, alpha};
-}
-
-void Propeller::setAero(double cl, double cd, double k) {
-  param.cl = cl;
-  param.cd = cd;
-  param.k = k;
-  _valid = false;
-  _validv1 = false;
 }
 
 /* Summarize the current propeller data and runtime information on the command

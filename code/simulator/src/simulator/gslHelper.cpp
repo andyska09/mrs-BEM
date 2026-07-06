@@ -188,7 +188,7 @@ double integrandPsi(double Psi, void* param) {
   const double cl = p.cl * alpha;
   const double cd = p.cd;
 #elif POLAR == 1
-  const double cl = p.cl * (std::sin(alpha) * std::cos(alpha) + 0.07);
+  const double cl = p.cl * std::sin(alpha) * std::cos(alpha);
   const double cd = p.cd * std::sin(alpha) * std::sin(alpha);
 #elif POLAR == 2
   const double tmp1 = std::exp(-p.M * (alpha - p.alpha0));
