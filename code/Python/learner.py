@@ -54,7 +54,7 @@ class Learner:
         else:
             self.learning_rate_fn = self.config.init_lr
 
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate_fn)
+        self.optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=self.learning_rate_fn)
 
         self.train_loss = tf.keras.metrics.Mean(name='train_loss')
         self.train_forces_loss = tf.keras.metrics.Mean(name='train_forces_loss')

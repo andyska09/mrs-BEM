@@ -4,7 +4,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## My goal, my rules and my story
 
-This repo goal is to recreate the NeuroBEM paper based on its attachements. My current additions are analysis/ which is for me to play around and analyze the data and outputs of the BEM model. Next, i recieved from my supervisor part of the simulator (in folder my_bem/), that is from the same lab as the paper, that implements BEM inside. I dont know what the end goal of my work is, but if would have to guess, it would probably be to improve this work, to make it more accurate dynamics model and also make it faster so it is usable in RL environment, but that is still far off to the future. Now I am trying to piece together what this code means. Right now I am trying to achieve numbers of just BEM from the paper, but there are some issues i need to overcome first. This is just the beginning of very exciting research journey.
+This repo goal is to recreate the NeuroBEM paper based on its attachements. My current additions are analysis/ which is for me to play around and analyze the data and outputs of the BEM model. Next, i recieved from my supervisor part of the simulator (in folder my_bem/), that is from the same lab as the paper, that implements BEM inside.
+
+From the MRS web page:
+
+Learned Hybrid Aerodynamic Modeling for Agile Multirotor Flight
+While control, planning, and perception have already reached significant milestones in UAV research, modeling aerodynamics remains one of the most open-ended problems in the field. This is caused by the complex phenomena that emerge during agile motion of multirotor UAVs, where each propeller blade is itself a wing interacting with all others. Classical modeling and gray-box approaches quickly fall short, and for agile flight of larger drones, this becomes a bottleneck that must be addressed. This project focuses on hybrid aerodynamic modeling that combines first-principles theory with machine learning. The work compares different hybrid modeling strategies and evaluates their tracking and disturbance-rejection performance in simulation and in real flight on agile platforms.
+[1] M. O'Connell, G. Shi, X. Shi, K. Azizzadenesheli, A. Anandkumar, Y. Yue, S.-J. Chung. "Neural-Fly enables rapid learning for agile flight in strong winds." Science Robotics, vol. 7, no. 66, eabm6597, 2022.
+[2] L. Bauersfeld, E. Kaufmann, P. Foehn, S. Sun, D. Scaramuzza. "NeuroBEM: Hybrid Aerodynamic Quadrotor Model." Robotics: Science and Systems, 2021.
+
+Advisor: Michal Pliska
+Email: pliskmic@fel.cvut.cz
+
+After conversation with AI chatbot I ended up on file current_goal.md
+
+### Current direction ([current_goal.md](current_goal.md))
+
+The active objective (sharpening the vaguer "recreate the paper" framing above): **port NeuroBEM into the Agilicious simulator and reproduce the paper's closed-loop tracking (Table III) entirely in sim.** Agilicious already ships the BEM rotor model; the work is to port the NN residual, wire it into the sim loop, and build the evaluation pipeline. No mocap access — all data and ground truth come from the public NeuroBEM dataset; we never record our own flights.
+
+- **NN residual (fixed interface):** input `20×10` (3 body linvel, 3 body rates, 4 motor speeds) @ 2.5 ms = 50 ms history; output 6 = residual force+torque added to BEM. Two heads (force/torque), strictly causal, **bounded output** (an unbounded torque residual crashed the paper's ablation), exported to C++ (ONNX Runtime / libtorch) at 1 kHz with the training normalization constants shipped alongside.
+- **Sim loop (per 1 ms tick):** low-level controller → first-order motor model → BEM+NN → rigid-body integrate. Use **symplectic Euler @ 1 ms** (Agilicious defaults to RK4 — switch it) and a BetaFlight-style rate loop, or comparisons to the paper are invalid.
+- **Evaluation ladder (in order):** (1) single-step RMSE on the held-out split (Table I target ≈ 0.352 N / 5.3e-3 Nm), (2) open-loop motor-replay rollout (position drift over ~1 s windows), (3) closed-loop MPC flying the reference trajectories vs. the recorded flights (Table III). Model selection uses trajectory drift, not per-step RMSE.
+- **Out of scope until the ladder reproduces the paper:** architecture swaps, multi-step/rollout training, BEM-solver improvements. `current_goal.md` is the full spec.
+
 
 ### IMPORTANT NOTE TO ALL AI CHATBOTS
 
@@ -38,11 +60,13 @@ Data flows through three loosely-coupled stages that communicate via CSV files o
 
 3. **Neural network (Python/TensorFlow)** — Train a network on the residuals. Code under [code/Python/](code/Python/).
 
+**Python env:** all Python (`analysis/` + `code/Python/`) runs in the `neurobem` conda env — `conda run -n neurobem python ...`.
+
 ### Key cross-stage coupling to be aware of
 
 - **`MODEL` is a compile-time choice.** The base model is selected by `#define MODEL` in [code/simulator/include/params.h](code/simulator/include/params.h): `1` = BEM, `0` = quadratic fit, `-1` = none. Changing it **requires rebuilding the simulator**, and the `model` variable in `Scripts/applyBM.sh` (and the `base_type` in the Python settings) must be changed to match. `MODEL` also drives the `CHORD`/`POLAR`/`DIST` sub-defines.
 - **Identified parameters are duplicated by hand**, not shared via a file. Values from MATLAB land in `setParam.m`, in `params.h` for the simulator, and ultimately in agilicious `sim_*.yaml`/`.hpp` files. When a physical parameter changes, all copies must change.
-- **The propeller `param` is now an instance member, not `static constexpr`** ([propeller.h:84](code/simulator/include/propeller.h#L84)). This was changed so the `identify` tool can override the aero coefficients at runtime via `setAero(cl, cd, k)` (plumbed `Quadcopter`→`Motor`→`Propeller`, invalidating cached results) without recompiling — see the re-identification workflow below. The defaults in `params.h` are still the source of truth for `bem-model`.
+- **Aero params are compile-time constants.** The propeller `param` is `static constexpr Propeller_s` ([propeller.h:82](code/simulator/include/propeller.h#L82)) with the `params.h` defaults as the single source of truth; changing `cl`/`cd`/`k` needs a rebuild. (An earlier experiment made `param` an instance member with a `setAero()` runtime override so the `identify` tool could re-fit without recompiling; that was reverted in the working tree along with `identify.cpp` — see the re-identification note below.)
 - The Python `base_type` setting (`"bem"`/`"fit"`/`"none"`) selects which `MODEL`-output subfolder to train on.
 
 ### Python NN internals
@@ -69,14 +93,14 @@ A **rotor model** (first principles) predicts `f_prop`/`τ_prop`; a **neural net
 - **Quadrotor & sim constants** that appear in code: motor first-order dynamics with time constant **τΩ = 33 ms** (`params.h: tau = 0.033`); the closed-loop simulator integrates with a **symplectic Euler** scheme at 1 ms (chosen for energy conservation); platform mass ≈ 0.772 kg with diagonal inertia (the `quadrotor:` block in the YAML).
 - **Data-processing rationale** (stage 2 MATLAB): Vicon pose at 400 Hz and onboard IMU + motor speeds at 1 kHz are asynchronous, so `MergeAndProcessData` fits **cubic splines** to fuse them and differentiates the splines to get low-noise linear velocity / angular acceleration. Time sync (offset + ~2.4% clock skew) is recovered by correlating gyro rates against the spline (the `align_data` subroutine); motor speeds get a 4th-order Butterworth low-pass. Full dataset in the paper: 96 flights / 1.8 M points, split 70/20/10 — matching the train/val/test counts produced by `get_datafiles.bash`.
 
-## Exploratory analysis & re-identification (`analysis/`)
+## Exploratory analysis (`analysis/`)
 
-A separate Python workspace (added after the pipeline docs above; **formerly `EDA/`** — that folder no longer exists, its files moved into `analysis/` and `utility.py` was renamed `utils.py`). Used for data-quality analysis, BEM-baseline evaluation, and **re-identifying the propeller aero coefficients**. Unlike the pipeline, these scripts read the **committed-locally, gitignored** `processed_data/` directly (repo-root, not `code/ExampleData/`), so they only run where that data is present. Deps: [analysis/requirements.txt](analysis/requirements.txt) (numpy/pandas/scipy/matplotlib/jupyter).
+A separate Python workspace (added after the pipeline docs above; **formerly `EDA/`** — that folder no longer exists, its files moved into `analysis/` and `utility.py` was renamed `utils.py`). Used for data-quality analysis and BEM-baseline evaluation (and, historically, propeller aero re-identification — see the note below). Unlike the pipeline, these scripts read the **committed-locally, gitignored** `processed_data/` directly (repo-root, not `code/ExampleData/`), so they only run where that data is present. Deps: [analysis/requirements.txt](analysis/requirements.txt) (numpy/pandas/scipy/matplotlib/jupyter).
 
-- [analysis/utils.py](analysis/utils.py) — shared loaders, noise metrics, and the **canonical column layout**. `load_flight`/`load_largest_segment` read `processed_data/merged_*_seg_*.csv` (29-column merged order hard-coded in `COLUMNS`, [utils.py:18](analysis/utils.py#L18)). `load_bem_flight`/`load_bem` read `processed_data/bem/bem_*_seg_*.csv`, which are now **47 columns**: the 29 merged cols **+ 6 predicted** `fx,fy,fz,tx,ty,tz` (29–34) **+ 12 per-motor diagnostics** `vi,mu,as` for motors 1–4 (35–46, indexed via `VI`/`MU`/`AS` at [utils.py:34](analysis/utils.py#L34)). `measured()`/`residuals()` compute force `= mass·acc` (acc already includes gravity) and torque `= I·ang_acc + ω×Iω` using the **simulator** mass/inertia ([utils.py:14](analysis/utils.py#L14)). `FS = 400 Hz`. SNR/noise split signal from noise with a 4th-order **25 Hz Butterworth** low-pass ([utils.py:89-102](analysis/utils.py#L89)); `noise_corpus(cache=…)` builds/caches the per-channel SNR table.
-- [analysis/bem_baseline.py](analysis/bem_baseline.py) — BEM baseline residual RMSE (measured − predicted) over the full set and the `testset.txt` hold-out. Run: `python3 analysis/bem_baseline.py` (defaults to `processed_data/bem` + root `testset.txt`).
-- **Re-identification workflow** (new). [analysis/make_subset.py](analysis/make_subset.py) pools all non-test `bem_*.csv`, bins rows on a `(mu, vi)` grid, and samples ~equally per cell so aggressive regimes aren't drowned out by hover — writing a fixed `analysis/subset_20k.csv` (same 47-col format). The C++ `identify` tool ([code/simulator/src/identify.cpp](code/simulator/src/identify.cpp)) then re-fits the three aero params `(cl, cd, k)` on that subset via a from-scratch **CMA-ES** in normalized coordinates, minimizing a combined force+torque RMSE loss (writes `convergence.csv`). Usage: `./identify subset.csv [cl cd k | --cma]`.
-- The 12 diagnostics come from the modified simulator: `Propeller::getDiagnostics()` returns `{vi, mu, alpha}` per prop, aggregated by `Quadcopter::getDiagnostics()` ([quadcopter.cpp:60](code/simulator/src/simulator/quadcopter.cpp#L60)). Notebooks: `noise_quality_eda.ipynb`, `pred_noise_eda.ipynb`, `vi_analysis.ipynb`.
+- [analysis/utils.py](analysis/utils.py) — shared loaders, noise metrics, and the **canonical column layout**. `load_flight`/`load_largest_segment` read `processed_data/merged_*_seg_*.csv` (29-column merged order hard-coded in `COLUMNS`, [utils.py:18](analysis/utils.py#L18)). `load_bem_flight`/`load_bem` read `processed_data/bem/bem_*_seg_*.csv`. The files **currently on disk are 47 columns**: the 29 merged cols **+ 6 predicted** `fx,fy,fz,tx,ty,tz` (29–34) **+ 12 per-motor diagnostics** `vi,mu,as` for motors 1–4 (35–46, indexed via `VI`/`MU`/`AS` at [utils.py:34](analysis/utils.py#L34)). ⚠ Those 12 diagnostics came from an earlier simulator build; the **current `bem-model` emits only the 6 predicted cols (35 total)**, so regenerating `processed_data/bem/` will break `load_bem`'s `VI`/`MU`/`AS` indexing until the diagnostics path is restored. `measured()`/`residuals()` compute force `= mass·acc` (acc already includes gravity) and torque `= I·ang_acc + ω×Iω` using the **simulator** mass/inertia ([utils.py:14](analysis/utils.py#L14)). `FS = 400 Hz`. SNR/noise split signal from noise with a 4th-order **25 Hz Butterworth** low-pass ([utils.py:89-102](analysis/utils.py#L89)); `noise_corpus(cache=…)` builds/caches the per-channel SNR table.
+- [analysis/measure_bem_RMSE.py](analysis/measure_bem_RMSE.py) — BEM baseline residual RMSE (measured − predicted) over the full set and the `testset.txt` hold-out. Run: `python3 analysis/measure_bem_RMSE.py` (defaults to `processed_data/bem` + root `testset.txt`; self-contained, hard-codes the simulator `mass = 0.752` / inertia).
+- **Re-identification workflow (historical — the C++ side was removed).** [analysis/make_subset.py](analysis/make_subset.py) pools all non-test `bem_*.csv`, bins rows on a `(mu, vi)` grid, and samples ~equally per cell so aggressive regimes aren't drowned out by hover — writing the fixed `analysis/subset_20k.csv` (47-col format), which is still present. The C++ `identify` tool that consumed it (a from-scratch **CMA-ES** re-fitting `(cl, cd, k)` in normalized coords, minimizing combined force+torque RMSE) has been **deleted from the working tree** along with its `setAero`/`getDiagnostics` plumbing; restore `code/simulator/src/identify.cpp` from git history to re-run it.
+- The 12 per-motor diagnostics were emitted by a now-reverted simulator path (`Propeller::getDiagnostics()` → `Quadcopter::getDiagnostics()`). Notebooks: [analysis/feature_analyis.ipynb](analysis/feature_analyis.ipynb), [analysis/pred_analysis.ipynb](analysis/pred_analysis.ipynb), [analysis/vi_analysis.ipynb](analysis/vi_analysis.ipynb).
 - `processed_data/bem/` is the local equivalent of the pipeline's stage-2 `MODEL/`/`bem+nn/` output that these scripts consume. `my_bem/simulator/` is a separate (agilicious-style) C++ model source tree, distinct from `code/simulator/`.
 
 ## Common commands
@@ -89,9 +113,9 @@ Requires GSL and Eigen (`sudo apt-get install libgsl-dev libeigen3-dev`). The re
 cd code/simulator
 mkdir build && cd build
 cmake ..
-make            # produces the `bem-model` and `identify` executables
+make            # produces the `bem-model` executable
 ```
-CMake options (default ON): `ENABLE_FAST`, `UNSAFE_MATH`, `ENABLE_PARALLEL` (OpenMP), `EIGEN_FROM_SYSTEM`. C++17, `-march=native`. Two targets: `bem-model` (pipeline stage 2) and `identify` (CMA-ES aero re-identification, see analysis section).
+CMake options (default ON): `ENABLE_FAST`, `UNSAFE_MATH`, `ENABLE_PARALLEL` (OpenMP), `EIGEN_FROM_SYSTEM`. C++17, `-march=native`. One target: `bem-model` (pipeline stage 2). An `identify` target (CMA-ES aero re-identification) used to build here but its source `identify.cpp` was removed from the working tree.
 
 ### Apply the base model to flight data
 ```
@@ -125,5 +149,5 @@ No CLI build/test harness — scripts are run inside MATLAB. Every function is d
 - **Flight-file naming is load-bearing.** All artifacts for one flight share a base ID (typically a timestamp like `2021-02-03-13-43-38`) with different prefixes/suffixes/extensions: `merged_<ID>_seg_X.csv`, `bem_<ID>_seg_X.csv`, `<ID>_traj.csv`, `<ID>.BFL`, etc. Scripts glob on these patterns, so renames break the pipeline.
 - BEM coning/flapping angles use the *linear* lift/drag coefficients (`param.a`/`param.d`); changing the *nonlinear* `param.cl`/`param.cd` will not move those angles. This is intentional (tractability).
 - `Coning.m` is described in the README as fragile/"a hack" (FFT of audio to recover prop RPM) — handle with care.
-- **Two different mass/inertia values are in play — cite the right one.** The C++ simulator uses `mass = 0.752`, `I = [0.00254, 0.00214, 0.00436]` ([params.h:115-118](code/simulator/include/params.h#L115)), and `analysis/utils.py` / `bem_baseline.py` / `identify.cpp` all follow it. The dataset `Readme.md` (and the paper-derived numbers earlier in this file) quote `0.772` and `[0.0025, 0.0021, 0.0043]`. Use the simulator values for anything computing forces/torques from `processed_data/bem/`.
+- **Two different mass/inertia values are in play — cite the right one.** The C++ simulator uses `mass = 0.752`, `I = [0.00254, 0.00214, 0.00436]` ([params.h:115-118](code/simulator/include/params.h#L115)), and `analysis/utils.py` / `measure_bem_RMSE.py` follow it. The dataset `Readme.md` (and the paper-derived numbers earlier in this file) quote `0.772` and `[0.0025, 0.0021, 0.0043]`. Use the simulator values for anything computing forces/torques from `processed_data/bem/`.
 - Gitignored outputs you should not commit: `Python/train_logs/`, `simulator/build/`, `Matlab/tmp/`, `*.trt`, `*.asv`.

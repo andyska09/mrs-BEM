@@ -40,7 +40,7 @@ loss:
   axis_weight_force: [ 1.0, 1.0, 3.0 ]
   axis_weight_torque: [ 1.0, 1.0, 1.0 ]
 optim:
-  max_epochs: 1000
+  max_epochs: 120
   batch_size: 128
   init_lr: 1e-3                      # initial learning rate
   l2_regularization: 0.0
@@ -50,7 +50,7 @@ optim:
     m_mul: 0.75                       # the lr jumps to this fraction of the previous learning rate
     alpha: 0.01                      # the minimum learning rate to be applied
 visualization:
-  generate_plots: True
+  generate_plots: False
   window_size_viz: 1000
 hardware:
   # num_cpu_workers: {-1: auto, 0: main thread, >0: ...}

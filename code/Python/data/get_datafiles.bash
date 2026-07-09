@@ -3,7 +3,7 @@
 main() {
   # settings:
   #    set number of training segments
-  Nval=2
+  Nval=49
   Ntest=1
   N=$[$Nval+$Ntest]
 
