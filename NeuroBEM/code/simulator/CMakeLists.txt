@@ -89,10 +89,13 @@ endif ()
 
 
 # Parallelization Flags
-if (ENABLE_PARALLEL)
+if (ENABLE_PARALLEL AND OpenMP_CXX_FOUND)
     message(STATUS "Enabling parallelization!")
-    set(CMAKE_CXX_PAR_FLAGS " -fopenmp")
+    set(CMAKE_CXX_PAR_FLAGS "")
 else ()
+    if (ENABLE_PARALLEL)
+        message(WARNING "ENABLE_PARALLEL set but OpenMP not found; building serial.")
+    endif ()
     set(CMAKE_CXX_PAR_FLAGS " -DEIGEN_DONT_PARALLELIZE")
 endif ()
 
@@ -127,11 +130,17 @@ if (NOT SOURCES)
 else ()
     add_library(${PROJECT_NAME} ${SOURCES})
     target_link_libraries(${PROJECT_NAME} ${GSL_LIBRARIES})
+    if (ENABLE_PARALLEL AND OpenMP_CXX_FOUND)
+        target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_CXX)
+    endif ()
     set(LIBRARY_NAME ${PROJECT_NAME})
 endif ()
 
 
 add_executable(bem-model src/simulator_node.cpp)
 target_link_libraries(bem-model ${LIBRARY_NAME})
+if (ENABLE_PARALLEL AND OpenMP_CXX_FOUND)
+    target_link_libraries(bem-model OpenMP::OpenMP_CXX)
+endif ()
 
 message(STATUS "===========   Done!   ==============")
