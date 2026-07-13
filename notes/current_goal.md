@@ -2,6 +2,13 @@
 
 Port NeuroBEM (Bauersfeld et al., RSS 2021) into the Agilicious simulator and reproduce the closed-loop simulation performance reported in the paper: simulated flights of the test trajectories should match the real recorded flights with accumulated positional error comparable to the paper's Table III results.
 
+**Advisor (Michal Pliska) priorities, in order:**
+1. Reproduce the paper's results.
+2. Try CMA-ES for parameter tuning — see what it can actually recover.
+3. Get the whole pipeline working end-to-end.
+
+The NN can be trained by me once the pipeline runs. **The real downstream task is applying this to the Eagle drone in closed-loop simulation** — the NeuroBEM reproduction is the stepping stone to that.
+
 ## Context
 
 - NeuroBEM = BEM rotor physics + a small NN predicting residual forces/torques on top.
