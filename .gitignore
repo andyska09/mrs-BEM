@@ -32,4 +32,5 @@ __pycache__/
 
 # === ML artifacts ===
 train_logs/
+code/Python/eval_out/
 *.trt
