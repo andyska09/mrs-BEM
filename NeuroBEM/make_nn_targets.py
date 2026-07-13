@@ -5,8 +5,8 @@ import numpy as np
 MASS = 0.772                                    # Readme.md
 INERTIA = np.array([0.0025, 0.0021, 0.0043])    # Readme.md
 
-SRC = Path("processed_data/bem-vi-baseline")
-DST = Path("processed_data/bem-baseline")
+SRC = Path("processed_data/bem")
+DST = Path("processed_data/bem")
 
 
 def residuals(d):
