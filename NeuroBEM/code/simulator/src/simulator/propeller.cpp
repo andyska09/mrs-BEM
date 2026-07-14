@@ -145,6 +145,17 @@ bool Propeller::setAttitudeRate(const Eigen::Vector3d att_rate) {
   return true;
 }
 
+void Propeller::setAero(double cl, double cd, double k) {
+  param.cl = cl;
+  param.cd = cd;
+  param.k = k;
+  solver->p.cl = cl;
+  solver->p.cd = cd;
+  solver->p.k = k;
+  _valid = false;
+  _validv1 = false;
+}
+
 /* Update the internal free stream velocity state of the propeller */
 bool Propeller::setVelocity(const Eigen::Vector3d velocity) {
   this->vel = velocity;

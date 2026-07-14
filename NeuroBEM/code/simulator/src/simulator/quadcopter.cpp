@@ -29,6 +29,11 @@ Quadcopter::Quadcopter() {
 
 Quadcopter::~Quadcopter() {}
 
+void Quadcopter::setAero(double cl, double cd, double k) {
+  for (Motor& m : motors) m.setAero(cl, cd, k);
+  _valid = false;
+}
+
 /* Internal function to update the state of the class */
 void Quadcopter::_update() {
   _calculateThrust();

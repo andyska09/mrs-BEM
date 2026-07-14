@@ -28,6 +28,7 @@ class Quadcopter {
   Eigen::Vector3d getTorque();
   Eigen::Vector3d getDrag();
   Eigen::Vector3d getForce();
+  void setAero(double cl, double cd, double k);
   void printInfo(const bool detailed = false);
 
  private:

@@ -38,6 +38,7 @@ class Propeller {
   bool setOmega(const double Omega);
   bool setVelocity(const Eigen::Vector3d velocity);
   bool setAttitudeRate(const Eigen::Vector3d att_rate);
+  void setAero(double cl, double cd, double k);
 
   void printInfo();
 
@@ -79,7 +80,7 @@ class Propeller {
   Eigen::Vector3d forceVec = {0, 0, 0};
   Eigen::Vector3d torqueVec = {0, 0, 0};
 
-  static constexpr Propeller_s param = Propeller_s();
+  Propeller_s param = Propeller_s();
   Runtime_s thrustRT, torqueRT, hforceRT, velocityRT;
   GSLHelper* solver = new GSLHelper();
 };

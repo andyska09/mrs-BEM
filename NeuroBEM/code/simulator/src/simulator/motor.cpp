@@ -80,6 +80,11 @@ Eigen::Vector3d Motor::getOffset() {
     return offset;
 }
 
+void Motor::setAero(double cl, double cd, double k) {
+    p.setAero(cl, cd, k);
+    _valid = false;
+}
+
 
 /* Function to print the motor info. Optionally an integer can be passed to
  * identify which motor information is printed. */
