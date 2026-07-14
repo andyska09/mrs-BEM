@@ -11,7 +11,7 @@ DATA_DIR = REPO_ROOT / "processed_data"
 BEM_DIR = DATA_DIR / "bem"
 FS = 400.0
 
-MASS = 0.752                                    # code/simulator/include/params.h
+MASS = 0.772
 INERTIA = np.array([0.00254, 0.00214, 0.00436])
 R = 5.1 * 2.54 / 2 * 1e-2                        # prop radius, params.h
 
