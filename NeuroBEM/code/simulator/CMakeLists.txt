@@ -143,4 +143,10 @@ if (ENABLE_PARALLEL AND OpenMP_CXX_FOUND)
     target_link_libraries(bem-model OpenMP::OpenMP_CXX)
 endif ()
 
+add_executable(cmaes src/CMAES.cpp)
+target_link_libraries(cmaes ${LIBRARY_NAME})
+if (ENABLE_PARALLEL AND OpenMP_CXX_FOUND)
+    target_link_libraries(cmaes OpenMP::OpenMP_CXX)
+endif ()
+
 message(STATUS "===========   Done!   ==============")
