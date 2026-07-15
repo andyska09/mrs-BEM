@@ -20,9 +20,11 @@ def measured(d):
 
 def report(name, fres, tres, rows):
     rf, rt = np.sqrt((fres**2).mean(0)), np.sqrt((tres**2).mean(0))
+    rf_tot = np.sqrt((fres**2).sum(1).mean())
+    rt_tot = np.sqrt((tres**2).sum(1).mean())
     print(f"\n[{name}] {len(rows) if isinstance(rows, list) else rows} rows")
-    print("  force  RMSE [N]  x/y/z:", np.round(rf, 4))
-    print("  torque RMSE [Nm] x/y/z:", np.round(rt, 5))
+    print("  force  RMSE [N]  x/y/z:", np.round(rf, 4), " total:", round(rf_tot, 4))
+    print("  torque RMSE [Nm] x/y/z:", np.round(rt, 5), " total:", round(rt_tot, 5))
 
 
 def main():
@@ -34,14 +36,15 @@ def main():
     args = ap.parse_args()
 
     test_ids = {l.strip() for l in open(args.testset) if l.strip()}
-    files = sorted(glob.glob(os.path.join(args.bem_dir, "bem_*.csv")))
+    pre = os.path.basename(args.bem_dir.rstrip("/"))
+    files = sorted(glob.glob(os.path.join(args.bem_dir, f"{pre}_*.csv")))
     if not files:
-        raise SystemExit(f"No bem_*.csv in {args.bem_dir}")
+        raise SystemExit(f"No {pre}_*.csv in {args.bem_dir}")
 
     fr_all, tr_all, n_all = [], [], 0
     fr_test, tr_test, n_test = [], [], 0
     for f in files:
-        fid = os.path.basename(f)[4:-4]
+        fid = os.path.basename(f)[len(pre) + 1 : -4]
         d = np.loadtxt(f, delimiter=",")
         fm, tm = measured(d)
         fr, tr = fm - d[:, 29:32], tm - d[:, 32:35]
