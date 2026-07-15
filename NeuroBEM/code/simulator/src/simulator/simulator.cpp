@@ -13,12 +13,13 @@ Simulator::Simulator() {
 /* Constructor for the simulator. This one is used to evaluate the simulation
  * for a csv file, which should be created with the MergeAndProcess MATLAB
  * script. */
-Simulator::Simulator(const char* infile, const char* outfile) {
+Simulator::Simulator(const char* infile, const char* outfile, const double* aero) {
   csvReader csv(infile);
   size_t nCol = csv.getNumberOfColumns();
   size_t nRow = csv.getNumberOfRows();
 
   Quadcopter quad;
+  if (aero) quad.setAero(aero[0], aero[1], aero[2]);
   std::vector<double> data(nCol + 6, 0);
 
   Eigen::Vector3d ang_acc;

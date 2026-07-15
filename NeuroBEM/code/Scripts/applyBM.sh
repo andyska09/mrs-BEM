@@ -5,7 +5,8 @@
 # file that supplies a list of names to be converted
 
 programPath="../simulator/build/bem-model"
-model="bem"
+model="bem-tuned"
+aero="14.329 14.454 5.89"   # cl cd k; empty = use compile-time defaults
 
 if [ "$1" != "" ]
 then
@@ -22,7 +23,7 @@ then
     dname=$1
     newfile=${fname:7}
     echo "$dname" "$fname" "$newfile"
-    eval "$programPath" "$csv" "$dname""/""$model""/""$model""_""$newfile"
+    eval "$programPath" "$csv" "$dname""/""$model""/""$model""_""$newfile" "$aero"
   done < "$2"
 else
   for csv in "$1"merged_*seg*.csv
@@ -31,7 +32,7 @@ else
     dname=$(dirname $csv)
     newfile=${fname:7}
     # echo "$dname" "$fname" "$newfile"
-    eval "$programPath" "$csv" "$dname""/""$model""/""$model""_""$newfile"
+    eval "$programPath" "$csv" "$dname""/""$model""/""$model""_""$newfile" "$aero"
   done
 fi
 

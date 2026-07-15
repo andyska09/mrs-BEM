@@ -14,5 +14,5 @@
 class Simulator {
  public:
   Simulator();
-  Simulator(const char* infile, const char* outfile);
+  Simulator(const char* infile, const char* outfile, const double* aero = nullptr);
 };
