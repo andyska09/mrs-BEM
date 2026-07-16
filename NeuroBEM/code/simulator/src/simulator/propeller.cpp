@@ -112,7 +112,7 @@ void Propeller::_update() {
   vind = _calculateInducedVelocity();
   thrust = _calculateThrust();
   torque = _calculateTorque();
-  hforce = _calculateHForce();
+  hforce = 3.0 * _calculateHForce();
 
 #if MODEL == 0
   a0 = 0;
