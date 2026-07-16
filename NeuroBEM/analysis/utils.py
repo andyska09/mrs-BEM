@@ -1,4 +1,5 @@
 """Shared helpers for the NeuroBEM EDA / analysis notebooks."""
+
 from pathlib import Path
 import re
 
@@ -8,43 +9,66 @@ from scipy import signal
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "processed_data"
-BEM_DIR = DATA_DIR / "bem"
+BEM_DIR = DATA_DIR / "bem-tuned"
+BEM_PREFIX = "bem-tuned"  # file prefix inside BEM_DIR; "bem" for the other tunes
 FS = 400.0
 
 MASS = 0.772
 INERTIA = np.array([0.00254, 0.00214, 0.00436])
-R = 5.1 * 2.54 / 2 * 1e-2                        # prop radius, params.h
+R = 5.1 * 2.54 / 2 * 1e-2  # prop radius, params.h
 
 COLUMNS = [
     "t",
-    "ang_acc_x", "ang_acc_y", "ang_acc_z",
-    "ang_vel_x", "ang_vel_y", "ang_vel_z",
-    "qx", "qy", "qz", "qw",
-    "acc_x", "acc_y", "acc_z",
-    "vel_x", "vel_y", "vel_z",
-    "pos_x", "pos_y", "pos_z",
-    "mot_1", "mot_2", "mot_3", "mot_4",
-    "dmot_1", "dmot_2", "dmot_3", "dmot_4",
+    "ang_acc_x",
+    "ang_acc_y",
+    "ang_acc_z",
+    "ang_vel_x",
+    "ang_vel_y",
+    "ang_vel_z",
+    "qx",
+    "qy",
+    "qz",
+    "qw",
+    "acc_x",
+    "acc_y",
+    "acc_z",
+    "vel_x",
+    "vel_y",
+    "vel_z",
+    "pos_x",
+    "pos_y",
+    "pos_z",
+    "mot_1",
+    "mot_2",
+    "mot_3",
+    "mot_4",
+    "dmot_1",
+    "dmot_2",
+    "dmot_3",
+    "dmot_4",
     "vbat",
 ]
 PRED = ["fx", "fy", "fz", "tx", "ty", "tz"]
-DIAG = [f"{m}_{i}" for i in range(1, 5) for m in ("vi", "mu", "as")]
-BEM_COLUMNS = COLUMNS + PRED + DIAG
+# DIAG = [f"{m}_{i}" for i in range(1, 5) for m in ("vi", "mu", "as")]
+BEM_COLUMNS = COLUMNS + PRED
 
-VI = [35, 38, 41, 44]      # induced velocity per motor
-MU = [36, 39, 42, 45]      # advance ratio per motor
-AS = [37, 40, 43, 46]      # shaft angle of attack per motor
+VI = [35, 38, 41, 44]  # induced velocity per motor
+MU = [36, 39, 42, 45]  # advance ratio per motor
+AS = [37, 40, 43, 46]  # shaft angle of attack per motor
 
 
 def flight_ids():
     r = re.compile(r"merged_(.+)_seg_\d+\.csv")
-    return sorted({r.match(p.name).group(1) for p in DATA_DIR.glob("merged_*_seg_*.csv")})
+    return sorted(
+        {r.match(p.name).group(1) for p in DATA_DIR.glob("merged_*_seg_*.csv")}
+    )
 
 
 def load_flight(flight_id):
     files = sorted(DATA_DIR.glob(f"merged_{flight_id}_seg_*.csv"))
-    return pd.concat([pd.read_csv(f, header=0, names=COLUMNS) for f in files],
-                     ignore_index=True)
+    return pd.concat(
+        [pd.read_csv(f, header=0, names=COLUMNS) for f in files], ignore_index=True
+    )
 
 
 def load_largest_segment(flight_id):
@@ -54,14 +78,18 @@ def load_largest_segment(flight_id):
 
 
 def bem_flight_ids():
-    r = re.compile(r"bem_(.+)_seg_\d+\.csv")
-    return sorted({r.match(p.name).group(1) for p in BEM_DIR.glob("bem_*_seg_*.csv")})
+    r = re.compile(rf"{re.escape(BEM_PREFIX)}_(.+)_seg_\d+\.csv")
+    return sorted(
+        {r.match(p.name).group(1) for p in BEM_DIR.glob(f"{BEM_PREFIX}_*_seg_*.csv")}
+    )
 
 
 def load_bem_flight(flight_id):
-    files = sorted(BEM_DIR.glob(f"bem_{flight_id}_seg_*.csv"))
-    return pd.concat([pd.read_csv(f, header=None, names=BEM_COLUMNS) for f in files],
-                     ignore_index=True)
+    files = sorted(BEM_DIR.glob(f"{BEM_PREFIX}_{flight_id}_seg_*.csv"))
+    return pd.concat(
+        [pd.read_csv(f, header=None, names=BEM_COLUMNS) for f in files],
+        ignore_index=True,
+    )
 
 
 def load_bem(bem_dir=BEM_DIR):
@@ -83,7 +111,7 @@ def residuals(d):
 
 
 def diagnostics(d):
-    return d[:, VI], d[:, MU], d[:, AS]   # each (N, 4)
+    return d[:, VI], d[:, MU], d[:, AS]  # each (N, 4)
 
 
 def lowpass(x, cutoff=25.0, fs=FS):
@@ -118,8 +146,14 @@ def noise_corpus(cache=None):
             if c == "t":
                 continue
             x = df[c].to_numpy()
-            rows.append({"flight": fid, "channel": c,
-                         "snr_db": snr_db(x), "noise_std": noise_std(x)})
+            rows.append(
+                {
+                    "flight": fid,
+                    "channel": c,
+                    "snr_db": snr_db(x),
+                    "noise_std": noise_std(x),
+                }
+            )
     out = pd.DataFrame(rows)
     if cache:
         out.to_csv(cache, index=False)
