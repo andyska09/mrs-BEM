@@ -1,0 +1,26 @@
+# BEM model config (defaults = params.h = raw paper BEM).
+# Keys follow the agilicious sim yaml. All keys are required.
+bem:
+  lift_coefficient: 15.24214       # cl0 in cl = cl0*(sin(a)cos(a) + lift_offset)
+  drag_coefficient: 13.54894       # cd0 in cd = cd0*sin^2(a)
+  hinge_spring_constant: 5.89      # k_beta [Nm/rad]
+  pitch: 21.77                     # theta0 [deg]
+  twist: -11.0                     # theta1, over full span [deg]
+  chord_inner: 0.017               # root chord [m]
+  chord_outer: 0.007               # tip chord [m]
+  radius: 0.064770                 # propeller radius [m]
+  lift_offset: 0.0                 # agilicious uses 0.07
+  hforce_scale: 1.0                # agilicious uses 3.0
+  num_blades: 3.0                  # load-only (not tuned)
+  air_density: 1.204               # load-only (not tuned)
+quad:
+  thrust_scale: 1.0                # scales body-z rotor force; agilicious ~1.3
+  dx: 0.078                        # motor x offset from CoG [m]
+  dy: 0.1                          # motor y offset from CoG [m]
+  dz: 0.027                        # motor z offset from CoG [m]
+body_drag:
+  horizontal_drag_coefficient: 1.0
+  vertical_drag_coefficient: 1.0
+  frontarea_x: 0.0054              # body silhouette areas [m^2]
+  frontarea_y: 0.009
+  frontarea_z: 0.006

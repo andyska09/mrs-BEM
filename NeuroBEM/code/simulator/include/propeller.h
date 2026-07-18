@@ -6,6 +6,8 @@
 #include <chrono>
 #include <cmath>
 #include <eigen3/Eigen/Core>
+#include <map>
+#include <string>
 #include <vector>
 
 #include "gslHelper.h"
@@ -38,7 +40,7 @@ class Propeller {
   bool setOmega(const double Omega);
   bool setVelocity(const Eigen::Vector3d velocity);
   bool setAttitudeRate(const Eigen::Vector3d att_rate);
-  void setAero(double cl, double cd, double k);
+  void load(const std::map<std::string, double>& config);
 
   void printInfo();
 

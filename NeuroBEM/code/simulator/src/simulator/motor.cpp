@@ -21,7 +21,7 @@ bool Motor::_update() {
     p.setState(Omega, vel_M, rate_B);
     force = p.getForceVector();
     torque = p.getTorqueVector();
-    torque[3] -= isCW() * dOmega * param.inertia;
+    torque[2] -= isCW() * dOmega * param.inertia;
     _valid = true;
     return true;
 }
@@ -80,8 +80,13 @@ Eigen::Vector3d Motor::getOffset() {
     return offset;
 }
 
-void Motor::setAero(double cl, double cd, double k) {
-    p.setAero(cl, cd, k);
+void Motor::setOffset(const Eigen::Vector3d offset) {
+    this->offset = offset;
+    _valid = false;
+}
+
+void Motor::load(const std::map<std::string, double>& config) {
+    p.load(config);
     _valid = false;
 }
 

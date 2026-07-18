@@ -3,6 +3,8 @@
 #include <cmath>
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Dense>
+#include <map>
+#include <string>
 
 #define MODEL 1
 /* MODEL sets the propeller model that is used
@@ -58,25 +60,27 @@ inline Eigen::Quaterniond frd2flu(const Eigen::Quaterniond flu) {
  * variable can't be used for fitting the value.  */
 struct Propeller_s {
   /* PARAMETER DECLARATIONS */
-  static constexpr double g = 9.81;     // Acceleration [m/s^2]
-  static constexpr double rho = 1.204;  // ISA air density [kg / m^3]
-  static constexpr double R =
-      5.1 * 2.54 / 2 * 1e-02;                     // Propeller Radius in [m]
-  static constexpr double A = M_PI * R * R;       // Propeller Area [m^2]
-  static constexpr double ef = 0.1;               // Hinge offset (relative)
-  static constexpr double e = ef * R;             // Hinge offset [m]
-  static constexpr double sigma = 0.215;          // Propeller Solidity Ratio
-  static constexpr double theta0 = toRad(21.77);  // Propeller Pitch [rad]
-  static constexpr double theta1 = toRad(-11);    // Propeller Twist [rad/m]
-  static constexpr double b = 3;                  // Number of Propeller Blades
-  static constexpr double c = 1.3 * 1e-02;        // Chord length [m]
-  static constexpr double ci = 1.7 * 1e-02;       // Chord length inside [m]
-  static constexpr double co = 0.7 * 1e-02;       // Chord length outside [m]
-  static constexpr double mb = 1.22e-3;           // Mass of one blade [kg]
-  static constexpr double cg = 2.7e-3;  // Distance of prop CoG to shaft
-  static constexpr double Ib =
-      mb * cg * cg + 0.25 * R * R / 12;      // Inertia of one blade
+  static constexpr double g = 9.81;        // Acceleration [m/s^2]
+  static constexpr double ef = 0.1;        // Hinge offset (relative)
+  static constexpr double sigma = 0.215;   // Propeller Solidity Ratio
+  static constexpr double c = 1.3 * 1e-02; // Chord length [m]
+  static constexpr double mb = 1.22e-3;    // Mass of one blade [kg]
+  static constexpr double cg = 2.7e-3;     // Distance of prop CoG to shaft
   static constexpr double Mb = mb * cg * g;  // Moment of blade around the hinge
+
+  double rho = 1.204;                 // ISA air density [kg / m^3]
+  double R = 5.1 * 2.54 / 2 * 1e-02;  // Propeller Radius in [m]
+  double b = 3;                       // Number of Propeller Blades
+  double A = M_PI * R * R;            // Propeller Area [m^2] (recomputed in load)
+  double e = ef * R;                  // Hinge offset [m]
+  double Ib = mb * cg * cg + 0.25 * R * R / 12;  // UNUSED - Inertia of one blade
+
+  double theta0 = toRad(21.77);  // Propeller Pitch [rad]
+  double theta1 = toRad(-11);    // Twist over full span [rad], applied as *r/R
+  double ci = 1.7 * 1e-02;       // Chord length inside [m]
+  double co = 0.7 * 1e-02;       // Chord length outside [m]
+  double cl_offset = 0;          // Lift polar offset (agilicious: 0.07)
+  double hforce_scale = 1;       // H-force scale (agilicious: 3.0)
 
 #if MODEL == -1
   double cd = 0;
@@ -104,6 +108,26 @@ struct Propeller_s {
   double alpha0 = toRad(12);  // Stall Angle
 #endif
   double k = 5.89;  // Spring constant of the hinge spring
+
+  /* Keys follow the agilicious BEMParameters yaml; pitch/twist in degrees.
+   * The config must contain all keys. */
+  void load(const std::map<std::string, double>& c) {
+#if !(MODEL == 1 && POLAR == 2)
+    cl = c.at("lift_coefficient");
+#endif
+    cd = c.at("drag_coefficient");
+    k = c.at("hinge_spring_constant");
+    theta0 = toRad(c.at("pitch"));
+    theta1 = toRad(c.at("twist"));
+    ci = c.at("chord_inner");
+    co = c.at("chord_outer");
+    cl_offset = c.at("lift_offset");
+    hforce_scale = c.at("hforce_scale");
+    rho = c.at("air_density");
+    R = c.at("radius");
+    b = c.at("num_blades");
+    A = M_PI * R * R;
+  }
 };
 
 struct Motor_s {
@@ -112,18 +136,33 @@ struct Motor_s {
 };
 
 struct Quadcopter_s {
-  double mass = 0.752;                 // Mass of the vehicle in kg
-  double Ixx = 0.00254;                // Mass of the vehicle in kg
-  double Iyy = 0.00214;                // Mass of the vehicle in kg
-  double Izz = 0.00436;                // Mass of the vehicle in kg
-  static constexpr double dx = 0.078;  // Propeller x offset from CoG
-  static constexpr double dy = 0.1;    // Propeller y offset from CoG
-  static constexpr double dz = 0.027;  // Propeller z offset from CoG
+  double mass = 0.752;   // Mass of the vehicle in kg
+  double Ixx = 0.00254;  // Mass of the vehicle in kg
+  double Iyy = 0.00214;  // Mass of the vehicle in kg
+  double Izz = 0.00436;  // Mass of the vehicle in kg
+  double dx = 0.078;     // Propeller x offset from CoG
+  double dy = 0.1;       // Propeller y offset from CoG
+  double dz = 0.027;     // Propeller z offset from CoG
 
+  double thrust_scale = 1;        // Body-z rotor force scale (agilicious: ~1.3)
   double cxy = 1;                 // Drag coefficient horizontal flight
   double cz = 1;                  // Drag coefficient vertical flight
   double Ax = 0.06 * 0.09;        // Area of the Quadcopter
   double Ay = 0.1 * 0.09;         // Area of the Quadcopter
-  double Az = 0.1 * 0.06;         // Area of the Quadcopter
-  double rho = Propeller_s::rho;  // Air density
+  double Az = 0.1 * 0.06;  // Area of the Quadcopter
+  double rho = 1.204;      // Air density
+
+  /* Drag keys follow the agilicious BodyDragParameters yaml */
+  void load(const std::map<std::string, double>& c) {
+    rho = c.at("air_density");
+    thrust_scale = c.at("thrust_scale");
+    dx = c.at("dx");
+    dy = c.at("dy");
+    dz = c.at("dz");
+    cxy = c.at("horizontal_drag_coefficient");
+    cz = c.at("vertical_drag_coefficient");
+    Ax = c.at("frontarea_x");
+    Ay = c.at("frontarea_y");
+    Az = c.at("frontarea_z");
+  }
 };

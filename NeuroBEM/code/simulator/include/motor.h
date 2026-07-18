@@ -21,7 +21,8 @@ class Motor {
   Eigen::Vector3d getThrust();
   Eigen::Vector3d getTorque();
   Eigen::Vector3d getOffset();
-  void setAero(double cl, double cd, double k);
+  void setOffset(const Eigen::Vector3d offset);
+  void load(const std::map<std::string, double>& config);
   void printInfo(const int num = 0);
 
  private:

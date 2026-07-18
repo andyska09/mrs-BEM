@@ -112,7 +112,7 @@ void Propeller::_update() {
   vind = _calculateInducedVelocity();
   thrust = _calculateThrust();
   torque = _calculateTorque();
-  hforce = 3.0 * _calculateHForce();
+  hforce = param.hforce_scale * _calculateHForce();
 
 #if MODEL == 0
   a0 = 0;
@@ -145,13 +145,9 @@ bool Propeller::setAttitudeRate(const Eigen::Vector3d att_rate) {
   return true;
 }
 
-void Propeller::setAero(double cl, double cd, double k) {
-  param.cl = cl;
-  param.cd = cd;
-  param.k = k;
-  solver->p.cl = cl;
-  solver->p.cd = cd;
-  solver->p.k = k;
+void Propeller::load(const std::map<std::string, double>& config) {
+  param.load(config);
+  static_cast<Propeller_s&>(solver->p) = param;
   _valid = false;
   _validv1 = false;
 }

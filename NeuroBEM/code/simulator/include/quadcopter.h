@@ -28,7 +28,7 @@ class Quadcopter {
   Eigen::Vector3d getTorque();
   Eigen::Vector3d getDrag();
   Eigen::Vector3d getForce();
-  void setAero(double cl, double cd, double k);
+  void load(const std::map<std::string, double>& config);
   void printInfo(const bool detailed = false);
 
  private:
@@ -44,10 +44,11 @@ class Quadcopter {
   Eigen::Vector3d thrust = {0, 0, 0};
   Eigen::Vector3d torque = {0, 0, 0};
   Eigen::Vector3d drag = {0, 0, 0};
-  static constexpr Quadcopter_s param = Quadcopter_s();
+  Quadcopter_s param;
   Timer_s timer;
 
   void _update();
+  void _placeMotors();
   bool _calculateThrust();
   bool _calculateTorque();
   bool _calculateDrag();

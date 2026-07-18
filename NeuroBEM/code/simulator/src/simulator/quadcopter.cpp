@@ -9,28 +9,27 @@
  * propellers */
 Quadcopter::Quadcopter() {
   motors.reserve(4);
-  motors.emplace_back(
-      Eigen::Vector3d(
-          std::vector<double>{-param.dx, param.dy, param.dz}.data()),
-      true);
-  motors.emplace_back(
-      Eigen::Vector3d(std::vector<double>{param.dx, param.dy, param.dz}.data()),
-      false);
-  motors.emplace_back(
-      Eigen::Vector3d(
-          std::vector<double>{-param.dx, -param.dy, param.dz}.data()),
-      false);
-  motors.emplace_back(
-      Eigen::Vector3d(
-          std::vector<double>{param.dx, -param.dy, param.dz}.data()),
-      true);
+  motors.emplace_back(Eigen::Vector3d::Zero(), true);
+  motors.emplace_back(Eigen::Vector3d::Zero(), false);
+  motors.emplace_back(Eigen::Vector3d::Zero(), false);
+  motors.emplace_back(Eigen::Vector3d::Zero(), true);
+  _placeMotors();
   omp_set_num_threads(motors.size());
 }
 
 Quadcopter::~Quadcopter() {}
 
-void Quadcopter::setAero(double cl, double cd, double k) {
-  for (Motor& m : motors) m.setAero(cl, cd, k);
+void Quadcopter::_placeMotors() {
+  motors[0].setOffset({-param.dx, param.dy, param.dz});
+  motors[1].setOffset({param.dx, param.dy, param.dz});
+  motors[2].setOffset({-param.dx, -param.dy, param.dz});
+  motors[3].setOffset({param.dx, -param.dy, param.dz});
+}
+
+void Quadcopter::load(const std::map<std::string, double>& config) {
+  param.load(config);
+  _placeMotors();
+  for (Motor& m : motors) m.load(config);
   _valid = false;
 }
 
@@ -142,6 +141,7 @@ bool Quadcopter::_calculateThrust() {
   thrust.setZero();
 #pragma omp parallel for reduction(+ : thrust)
   for (size_t i = 0; i < motors.size(); ++i) thrust += motors[i].getThrust();
+  thrust[2] *= param.thrust_scale;
   return true;
 }
 

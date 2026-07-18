@@ -14,5 +14,6 @@
 class Simulator {
  public:
   Simulator();
-  Simulator(const char* infile, const char* outfile, const double* aero = nullptr);
+  Simulator(const char* infile, const char* outfile,
+            const std::map<std::string, double>& config = {});
 };
