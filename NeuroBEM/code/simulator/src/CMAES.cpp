@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -182,7 +184,8 @@ static void report(Quadcopter &quad, const std::vector<Sample> &data,
 
 static std::map<std::string, double> cma(Quadcopter &quad,
                                          const std::vector<Sample> &data, int N,
-                                         bool joint, double sf, double st)
+                                         bool joint, double sf, double st,
+                                         const std::string &outdir)
 {
     VectorXd def(N), scale(N), xlo(N), xhi(N);
     for (int i = 0; i < N; ++i)
@@ -226,7 +229,12 @@ static std::map<std::string, double> cma(Quadcopter &quad,
 
     VectorXd best_x = mean;
     double best_f = 1e18;
-    std::ofstream log("convergence.csv");
+    char ts[32];
+    std::time_t now = std::time(nullptr);
+    std::strftime(ts, sizeof(ts), "%Y-%m-%d-%H-%M-%S", std::localtime(&now));
+    std::string logpath = outdir + "/convergence_" + ts + ".csv";
+    printf("logging to %s\n", logpath.c_str());
+    std::ofstream log(logpath);
     log << "gen,loss";
     for (int i = 0; i < N; ++i)
         log << ',' << REGISTRY[i].key;
@@ -295,6 +303,7 @@ static std::map<std::string, double> cma(Quadcopter &quad,
         for (int i = 0; i < N; ++i)
             log << ',' << def[i] + best_x[i] * scale[i];
         log << '\n';
+        log.flush();
         if (gen % 10 == 0)
             printf("gen %3d  loss %.5f  sigma %.4f\n", gen, best_f, sigma);
         if (sigma < 1e-4)
@@ -347,7 +356,12 @@ int main(int argc, char **argv)
         printf("--- baseline (defaults) ---\n");
         report(quad, data, defaults());
         printf("--- CMA-ES ---\n");
-        std::map<std::string, double> best = cma(quad, data, N, joint, sf, st);
+        std::string outdir =
+            (std::filesystem::path(argv[1]).parent_path().parent_path() /
+             "CMAES-results")
+                .string();
+        std::map<std::string, double> best =
+            cma(quad, data, N, joint, sf, st, outdir);
         std::ofstream out("best.yaml");
         writeYaml(out, best);
         printf("--- best (written to best.yaml) ---\n");

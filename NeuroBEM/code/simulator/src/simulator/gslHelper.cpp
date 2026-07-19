@@ -6,6 +6,7 @@
 
 /* Contructor for GSL Solver/Integrator Class */
 GSLHelper::GSLHelper() {
+  gsl_set_error_handler_off();  // report-and-continue; never abort the process
   F.function = &solverV1;
   F.params = (void*)&p;
   T = gsl_root_fsolver_brent;
@@ -66,11 +67,12 @@ double GSLHelper::_findZero() {
   if (GSL_FN_EVAL(&F, v1min) * GSL_FN_EVAL(&F, v1max) >= 0) {
     v1min = -20;
     v1max = 30;
-    if (GSL_FN_EVAL(&F, v1min) * GSL_FN_EVAL(&F, v1max) >= 0)
-      printf(
-          "GSL Root Finding using wider limits failed:\
-                    \nOmega %f\tvtot %f\tvver %f\talpha %f\tmu %f\n",
-          p.Omega, p.vtot, p.vver, p.alpha, p.mu);
+    const double flo = GSL_FN_EVAL(&F, v1min), fhi = GSL_FN_EVAL(&F, v1max);
+    if (flo * fhi >= 0) {
+      // Root not bracketed even in the widened window (e.g. extreme params
+      // during CMA-ES): clamp to the closest endpoint instead of aborting.
+      return std::abs(flo) < std::abs(fhi) ? v1min : v1max;
+    }
   }
   gsl_root_fsolver_set(s, &F, v1min, v1max);
   do {
