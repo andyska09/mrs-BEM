@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 When talking to me start the message with "TARS:". When writing answer always keep it concise and information dense. But do not skip important stuff. When I tell you to fuck off or shout and curse at you DO NOT apologize, it wastes tokens, just follow orders. Next when writing code DO NOT write stupid comments and docstrings. Keep the code clean and high quality. When implementing stuff KEEP IT SIMPLE. This important. I do not want to read 1000 lines of diffs, I want to look at the change and know what it does. As one artist said "One good girl is worth a thousand bitches.".
 
+Also IDE is wrongly configured, so it will report wrong include errors etc. So do not worry about it. Only investigate when neccessary. 
+
+When listing commands to me, one command one line. If there is more than one command or it is super duper complex i will spank you. HARD.
+
 ## My goal, my rules and my story
 
 This repo's goal is to recreate the NeuroBEM paper and port it into the **Agilicious** simulator for closed-loop evaluation. `NeuroBEM/analysis/` is my own workspace to play with and analyze the data and outputs of the BEM model. `agilicious/simulator/` is part of the simulator I received from my supervisor (from the same lab as the paper) that implements BEM inside — the deployment target.
