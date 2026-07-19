@@ -35,45 +35,40 @@ static constexpr int MAXGEN = 300;
 struct ParamSpec
 {
     const char *key;
+    const char *section;
     double def, lo, hi; // defaults must match params.h; pitch/twist in degrees
 };
 
-// ordered by optimization priority: --cma N frees the first N entries
+// ordered by optimization priority: --cma N frees the first N entries.
+// `section` groups the key in the emitted YAML (single source of truth).
 static const std::vector<ParamSpec> REGISTRY = {
-    {"lift_coefficient", 15.24214, 0.5, 40},
-    {"drag_coefficient", 13.54894, 0.5, 40},
-    {"hinge_spring_constant", 5.89, 0.5, 30},
-    {"lift_offset", 0, -0.2, 0.3},
-    {"hforce_scale", 1, 0.1, 6},
-    {"thrust_scale", 1, 0.5, 2},
-    {"pitch", 21.77, 3, 40},
-    {"twist", -11, -34, 6},
-    {"chord_inner", 1.7e-2, 0.005, 0.04},
-    {"chord_outer", 0.7e-2, 0.002, 0.03},
-    {"horizontal_drag_coefficient", 1, 0.1, 5},
-    {"vertical_drag_coefficient", 1, 0.1, 5},
-    {"radius", 0.064770, 0.04, 0.09},
-    {"dx", 0.078, 0.04, 0.15},
-    {"dy", 0.1, 0.05, 0.2},
-    {"dz", 0.027, -0.05, 0.1},
-    {"frontarea_x", 0.06 * 0.09, 0, 0.03},
-    {"frontarea_y", 0.1 * 0.09, 0, 0.03},
-    {"frontarea_z", 0.1 * 0.06, 0, 0.03},
+    {"lift_coefficient", "bem", 15.24214, 0.5, 40},
+    {"drag_coefficient", "bem", 13.54894, 0.5, 40},
+    {"hinge_spring_constant", "bem", 5.89, 0.5, 30},
+    {"lift_offset", "bem", 0, -0.2, 0.3},
+    {"hforce_scale", "bem", 1, 0.1, 6},
+    {"thrust_scale", "quad", 1, 0.5, 2},
+    {"pitch", "bem", 21.77, 3, 40},
+    {"twist", "bem", -11, -34, 6},
+    {"chord_inner", "bem", 1.7e-2, 0.005, 0.04},
+    {"chord_outer", "bem", 0.7e-2, 0.002, 0.03},
+    {"horizontal_drag_coefficient", "body_drag", 1, 0.1, 5},
+    {"vertical_drag_coefficient", "body_drag", 1, 0.1, 5},
+    {"radius", "bem", 0.064770, 0.04, 0.09},
+    {"dx", "quad", 0.078, 0.04, 0.15},
+    {"dy", "quad", 0.1, 0.05, 0.2},
+    {"dz", "quad", 0.027, -0.05, 0.1},
+    {"frontarea_x", "body_drag", 0.06 * 0.09, 0, 0.03},
+    {"frontarea_y", "body_drag", 0.1 * 0.09, 0, 0.03},
+    {"frontarea_z", "body_drag", 0.1 * 0.06, 0, 0.03},
     // load-only tail: keep N below these so they stay at default
-    {"num_blades", 3, 2, 4},
-    {"air_density", 1.204, 1.0, 1.4},
+    {"num_blades", "bem", 3, 2, 4},
+    {"air_density", "bem", 1.204, 1.0, 1.4},
 };
 
-static const std::map<std::string, std::vector<const char *>> SECTIONS = {
-    {"bem",
-     {"lift_coefficient", "drag_coefficient", "hinge_spring_constant", "pitch",
-      "twist", "chord_inner", "chord_outer", "radius", "lift_offset",
-      "hforce_scale", "num_blades", "air_density"}},
-    {"quad", {"thrust_scale", "dx", "dy", "dz"}},
-    {"body_drag",
-     {"horizontal_drag_coefficient", "vertical_drag_coefficient", "frontarea_x",
-      "frontarea_y", "frontarea_z"}},
-};
+// YAML section emission order
+static const std::vector<const char *> SECTION_ORDER = {"bem", "quad",
+                                                        "body_drag"};
 
 static std::map<std::string, double> defaults()
 {
@@ -86,11 +81,12 @@ static std::map<std::string, double> defaults()
 static void writeYaml(std::ostream &os, const std::map<std::string, double> &c)
 {
     os << std::setprecision(9);
-    for (const auto &[section, keys] : SECTIONS)
+    for (const char *section : SECTION_ORDER)
     {
         os << section << ":\n";
-        for (const char *key : keys)
-            os << "  " << key << ": " << c.at(key) << '\n';
+        for (const ParamSpec &p : REGISTRY)
+            if (std::string(p.section) == section)
+                os << "  " << p.key << ": " << c.at(p.key) << '\n';
     }
 }
 
@@ -101,39 +97,55 @@ struct Sample
     std::vector<double> omega;
 };
 
+namespace col
+{
+    constexpr int ANG_ACC = 1, ANG_VEL = 4, QUAT_XYZ = 7, QUAT_W = 10, ACC = 11,
+                  VEL = 14, POS = 17, OMEGA = 20, MIN = 28;
+}
+
+static bool parseRow(const std::string &line, Sample &s)
+{
+    if (line.empty() || (!std::isdigit(line[0]) && line[0] != '-'))
+        return false;
+    std::stringstream ss(line);
+    std::vector<double> v;
+    std::string cell;
+    while (std::getline(ss, cell, ','))
+        v.push_back(std::stod(cell));
+    if ((int)v.size() < col::MIN)
+        return false;
+
+    auto vec3 = [&](int i)
+    { return Vector3d(v[i], v[i + 1], v[i + 2]); };
+    s.ang_acc = vec3(col::ANG_ACC);
+    s.ang_vel = vec3(col::ANG_VEL);
+    s.quat = Eigen::Quaterniond(v[col::QUAT_W], v[col::QUAT_XYZ],
+                                v[col::QUAT_XYZ + 1], v[col::QUAT_XYZ + 2]);
+    s.acc = vec3(col::ACC);
+    s.vel = vec3(col::VEL);
+    s.pos = vec3(col::POS);
+    s.omega = {v[col::OMEGA], v[col::OMEGA + 1], v[col::OMEGA + 2],
+               v[col::OMEGA + 3]};
+    s.fmeas = MASS * s.acc;
+    s.tmeas = INERTIA.cwiseProduct(s.ang_acc) +
+              s.ang_vel.cross(INERTIA.cwiseProduct(s.ang_vel));
+    return true;
+}
+
 static std::vector<Sample> load(const std::string &path)
 {
-    std::vector<Sample> out;
     std::ifstream file(path);
     if (!file)
     {
         fprintf(stderr, "cannot open %s\n", path.c_str());
         exit(1);
     }
-    std::string line, cell;
+    std::vector<Sample> out;
+    std::string line;
+    Sample s;
     while (std::getline(file, line))
-    {
-        if (!line.empty() && !std::isdigit(line[0]) && line[0] != '-')
-            continue;
-        std::stringstream ss(line);
-        std::vector<double> v;
-        while (std::getline(ss, cell, ','))
-            v.push_back(std::stod(cell));
-        if (v.size() < 28)
-            continue;
-        Sample s;
-        s.ang_acc = {v[1], v[2], v[3]};
-        s.ang_vel = {v[4], v[5], v[6]};
-        s.quat = Eigen::Quaterniond(v[10], v[7], v[8], v[9]); // w, x, y, z
-        s.acc = {v[11], v[12], v[13]};
-        s.vel = {v[14], v[15], v[16]};
-        s.pos = {v[17], v[18], v[19]};
-        s.omega = {v[20], v[21], v[22], v[23]};
-        s.fmeas = MASS * s.acc;
-        s.tmeas = INERTIA.cwiseProduct(s.ang_acc) +
-                  s.ang_vel.cross(INERTIA.cwiseProduct(s.ang_vel));
-        out.push_back(s);
-    }
+        if (parseRow(line, s))
+            out.push_back(s);
     return out;
 }
 
@@ -182,155 +194,310 @@ static void report(Quadcopter &quad, const std::vector<Sample> &data,
     printf("torque RMSE: %.5f %.5f %.5f\n", tr[0], tr[1], tr[2]);
 }
 
+// ---- generic (N,1)-CMA-ES over an unbounded x-space -----------------------
+struct Offspring
+{
+    VectorXd normal; // z ~ N(0, I)
+    VectorXd step;   // correlated step B*D*z in the covariance geometry
+    VectorXd point;  // candidate x = mean + sigma*step
+};
+
+class Cma
+{
+public:
+    explicit Cma(int dim) : dim_(dim), rng_(0), randn_(0.0, 1.0)
+    {
+        numOffspring_ = 4 + (int)(3 * std::log((double)dim_));
+        numParents_ = numOffspring_ / 2;
+
+        weights_.resize(numParents_);
+        for (int i = 0; i < numParents_; ++i)
+            weights_[i] = std::log(numParents_ + 0.5) - std::log(i + 1.0);
+        weights_ /= weights_.sum();
+        effectiveParents_ = 1.0 / weights_.squaredNorm();
+
+        pathCovarianceRate_ = (4 + effectiveParents_ / dim_) /
+                              (dim_ + 4 + 2 * effectiveParents_ / dim_);
+        pathSigmaRate_ =
+            (effectiveParents_ + 2) / (dim_ + effectiveParents_ + 5);
+        rankOneRate_ = 2.0 / ((dim_ + 1.3) * (dim_ + 1.3) + effectiveParents_);
+        rankMuRate_ = std::min(
+            1 - rankOneRate_,
+            2 * (effectiveParents_ - 2 + 1 / effectiveParents_) /
+                ((dim_ + 2) * (dim_ + 2) + effectiveParents_));
+        sigmaDamping_ =
+            1 +
+            2 * std::max(
+                    0.0,
+                    std::sqrt((effectiveParents_ - 1.0) / (dim_ + 1)) - 1) +
+            pathSigmaRate_;
+        expectedStepNorm_ =
+            std::sqrt((double)dim_) *
+            (1 - 1.0 / (4 * dim_) + 1.0 / (21.0 * dim_ * dim_));
+
+        mean_ = VectorXd::Zero(dim_);
+        sigma_ = 0.2;
+        covariance_ = MatrixXd::Identity(dim_, dim_);
+        pathSigma_ = VectorXd::Zero(dim_);
+        pathCovariance_ = VectorXd::Zero(dim_);
+    }
+
+    double sigma() const { return sigma_; }
+    const VectorXd &mean() const { return mean_; }
+
+    std::vector<Offspring> sample()
+    {
+        Eigen::SelfAdjointEigenSolver<MatrixXd> es(covariance_);
+        eigenvectors_ = es.eigenvectors();
+        VectorXd axisLengths = es.eigenvalues().cwiseMax(1e-12).cwiseSqrt();
+
+        std::vector<Offspring> population(numOffspring_);
+        for (Offspring &o : population)
+        {
+            o.normal.resize(dim_);
+            for (int i = 0; i < dim_; ++i)
+                o.normal[i] = randn_(rng_);
+            o.step = eigenvectors_ * (axisLengths.asDiagonal() * o.normal);
+            o.point = mean_ + sigma_ * o.step;
+        }
+        return population;
+    }
+
+    // `ranked` holds population indices sorted best-first by external fitness.
+    void update(const std::vector<Offspring> &population,
+                const std::vector<int> &ranked, int gen)
+    {
+        VectorXd meanNormal = VectorXd::Zero(dim_);
+        VectorXd meanStep = VectorXd::Zero(dim_);
+        mean_.setZero();
+        for (int i = 0; i < numParents_; ++i)
+        {
+            const Offspring &parent = population[ranked[i]];
+            meanNormal += weights_[i] * parent.normal;
+            meanStep += weights_[i] * parent.step;
+            mean_ += weights_[i] * parent.point;
+        }
+
+        pathSigma_ = (1 - pathSigmaRate_) * pathSigma_ +
+                     std::sqrt(pathSigmaRate_ * (2 - pathSigmaRate_) *
+                               effectiveParents_) *
+                         (eigenvectors_ * meanNormal);
+
+        double normalizedPathLength =
+            pathSigma_.norm() /
+            std::sqrt(1 - std::pow(1 - pathSigmaRate_, 2.0 * (gen + 1))) /
+            expectedStepNorm_;
+        double heaviside =
+            normalizedPathLength < 1.4 + 2.0 / (dim_ + 1) ? 1.0 : 0.0;
+
+        pathCovariance_ =
+            (1 - pathCovarianceRate_) * pathCovariance_ +
+            heaviside *
+                std::sqrt(pathCovarianceRate_ * (2 - pathCovarianceRate_) *
+                          effectiveParents_) *
+                meanStep;
+
+        MatrixXd rankMuUpdate = MatrixXd::Zero(dim_, dim_);
+        for (int i = 0; i < numParents_; ++i)
+            rankMuUpdate += weights_[i] * population[ranked[i]].step *
+                            population[ranked[i]].step.transpose();
+
+        double stallCorrection =
+            (1 - heaviside) * pathCovarianceRate_ * (2 - pathCovarianceRate_);
+        covariance_ =
+            (1 - rankOneRate_ - rankMuRate_) * covariance_ +
+            rankOneRate_ * (pathCovariance_ * pathCovariance_.transpose() +
+                            stallCorrection * covariance_) +
+            rankMuRate_ * rankMuUpdate;
+        covariance_ = (covariance_ + covariance_.transpose()) / 2;
+
+        sigma_ *= std::exp((pathSigmaRate_ / sigmaDamping_) *
+                           (pathSigma_.norm() / expectedStepNorm_ - 1));
+    }
+
+private:
+    int dim_, numOffspring_, numParents_;
+    VectorXd weights_;
+    double effectiveParents_, pathCovarianceRate_, pathSigmaRate_, rankOneRate_,
+        rankMuRate_, sigmaDamping_, expectedStepNorm_;
+    VectorXd mean_, pathSigma_, pathCovariance_;
+    double sigma_;
+    MatrixXd covariance_, eigenvectors_;
+    std::mt19937 rng_;
+    std::normal_distribution<double> randn_;
+};
+
+// x-space bounds/penalty for the box constraint (soft, quadratic)
+static constexpr double SIGMA_STOP = 1e-4;
+static constexpr double PENALTY = 1e3;
+
+// Maps CMA-ES's unbounded x-space onto the bounded BEM params of the first N
+// registry entries (x=0 -> default, |x|=1 -> a bound), with a soft box.
+class SearchSpace
+{
+public:
+    explicit SearchSpace(int n) : n_(n), def_(n), scale_(n), xlo_(n), xhi_(n)
+    {
+        for (int i = 0; i < n_; ++i)
+        {
+            def_[i] = REGISTRY[i].def;
+            scale_[i] = (REGISTRY[i].hi - REGISTRY[i].lo) / 2;
+            xlo_[i] = (REGISTRY[i].lo - def_[i]) / scale_[i];
+            xhi_[i] = (REGISTRY[i].hi - def_[i]) / scale_[i];
+        }
+    }
+
+    VectorXd clamp(const VectorXd &x) const
+    {
+        return x.cwiseMax(xlo_).cwiseMin(xhi_);
+    }
+    double penalty(const VectorXd &x) const
+    {
+        return (x - clamp(x)).squaredNorm();
+    }
+    VectorXd params(const VectorXd &x) const
+    {
+        return def_ + x.cwiseProduct(scale_);
+    }
+    std::map<std::string, double> toConfig(const VectorXd &x) const
+    {
+        std::map<std::string, double> c = defaults();
+        VectorXd p = params(x);
+        for (int i = 0; i < n_; ++i)
+            c[REGISTRY[i].key] = p[i];
+        return c;
+    }
+
+private:
+    int n_;
+    VectorXd def_, scale_, xlo_, xhi_;
+};
+
+// Opens outdir/convergence_<timestamp>.csv with a "gen,loss,<param...>" header.
+static std::ofstream openLog(const std::string &outdir, int N)
+{
+    char ts[32];
+    std::time_t now = std::time(nullptr);
+    std::strftime(ts, sizeof(ts), "%Y-%m-%d-%H-%M-%S", std::localtime(&now));
+    std::string path = outdir + "/convergence_" + ts + ".csv";
+    printf("logging to %s\n", path.c_str());
+    std::ofstream log(path);
+    log << "gen,loss";
+    for (int i = 0; i < N; ++i)
+        log << ',' << REGISTRY[i].key;
+    log << '\n';
+    return log;
+}
+
+static double objective(Quadcopter &quad, const std::vector<Sample> &data,
+                        const SearchSpace &space, const VectorXd &x, double sf,
+                        double st, bool joint)
+{
+    double value = loss(quad, data, space.toConfig(space.clamp(x)), sf, st,
+                        joint) +
+                   PENALTY * space.penalty(x);
+    return std::isfinite(value) ? value : 1e12;
+}
+
+static std::vector<int> rankByFitness(const std::vector<double> &fitness)
+{
+    std::vector<int> order(fitness.size());
+    for (size_t i = 0; i < order.size(); ++i)
+        order[i] = (int)i;
+    std::sort(order.begin(), order.end(),
+              [&](int a, int b)
+              { return fitness[a] < fitness[b]; });
+    return order;
+}
+
+static void logGeneration(std::ofstream &log, int gen, double loss,
+                          const VectorXd &params)
+{
+    log << gen << ',' << loss;
+    for (Eigen::Index i = 0; i < params.size(); ++i)
+        log << ',' << params[i];
+    log << '\n';
+    log.flush();
+}
+
 static std::map<std::string, double> cma(Quadcopter &quad,
                                          const std::vector<Sample> &data, int N,
                                          bool joint, double sf, double st,
                                          const std::string &outdir)
 {
-    VectorXd def(N), scale(N), xlo(N), xhi(N);
-    for (int i = 0; i < N; ++i)
-    {
-        def[i] = REGISTRY[i].def;
-        scale[i] = (REGISTRY[i].hi - REGISTRY[i].lo) / 2;
-        xlo[i] = (REGISTRY[i].lo - def[i]) / scale[i];
-        xhi[i] = (REGISTRY[i].hi - def[i]) / scale[i];
-    }
-    auto toConfig = [&](const VectorXd &x)
-    {
-        std::map<std::string, double> c = defaults();
-        for (int i = 0; i < N; ++i)
-            c[REGISTRY[i].key] = def[i] + x[i] * scale[i];
-        return c;
-    };
+    SearchSpace space(N);
+    Cma optimizer(N);
+    std::ofstream log = openLog(outdir, N);
 
-    const int lambda = 4 + (int)(3 * std::log((double)N));
-    const int mu = lambda / 2;
-    VectorXd w(mu);
-    for (int i = 0; i < mu; ++i)
-        w[i] = std::log(mu + 0.5) - std::log(i + 1.0);
-    w /= w.sum();
-    const double mueff = 1.0 / w.squaredNorm();
-    const double cc = (4 + mueff / N) / (N + 4 + 2 * mueff / N);
-    const double cs = (mueff + 2) / (N + mueff + 5);
-    const double c1 = 2.0 / ((N + 1.3) * (N + 1.3) + mueff);
-    const double cmu = std::min(
-        1 - c1, 2 * (mueff - 2 + 1 / mueff) / ((N + 2) * (N + 2) + mueff));
-    const double ds =
-        1 + 2 * std::max(0.0, std::sqrt((mueff - 1.0) / (N + 1)) - 1) + cs;
-    const double chiN =
-        std::sqrt((double)N) * (1 - 1.0 / (4 * N) + 1.0 / (21.0 * N * N));
-
-    VectorXd mean = VectorXd::Zero(N); // x-coords: param = def + x * scale
-    double sigma = 0.2;
-    MatrixXd C = MatrixXd::Identity(N, N);
-    VectorXd ps = VectorXd::Zero(N), pc = VectorXd::Zero(N);
-    std::mt19937 rng(0);
-    std::normal_distribution<double> randn(0.0, 1.0);
-
-    VectorXd best_x = mean;
-    double best_f = 1e18;
-    char ts[32];
-    std::time_t now = std::time(nullptr);
-    std::strftime(ts, sizeof(ts), "%Y-%m-%d-%H-%M-%S", std::localtime(&now));
-    std::string logpath = outdir + "/convergence_" + ts + ".csv";
-    printf("logging to %s\n", logpath.c_str());
-    std::ofstream log(logpath);
-    log << "gen,loss";
-    for (int i = 0; i < N; ++i)
-        log << ',' << REGISTRY[i].key;
-    log << '\n';
+    VectorXd best_x = optimizer.mean();
+    double best_loss = 1e18;
 
     for (int gen = 0; gen < MAXGEN; ++gen)
     {
-        Eigen::SelfAdjointEigenSolver<MatrixXd> es(C);
-        MatrixXd B = es.eigenvectors();
-        VectorXd D = es.eigenvalues().cwiseMax(1e-12).cwiseSqrt();
+        std::vector<Offspring> population = optimizer.sample();
 
-        std::vector<VectorXd> zs(lambda), ys(lambda), xs(lambda);
-        std::vector<std::pair<double, int>> fit(lambda);
-        for (int k = 0; k < lambda; ++k)
-        {
-            VectorXd z(N);
-            for (int i = 0; i < N; ++i)
-                z[i] = randn(rng);
-            VectorXd y = B * (D.asDiagonal() * z);
-            VectorXd x = mean + sigma * y;
-            VectorXd xc = x.cwiseMax(xlo).cwiseMin(xhi);
-            double pen = (x - xc).squaredNorm();
-            double f = loss(quad, data, toConfig(xc), sf, st, joint) + 1e3 * pen;
-            if (!std::isfinite(f))
-                f = 1e12;
-            zs[k] = z;
-            ys[k] = y;
-            xs[k] = x;
-            fit[k] = {f, k};
-        }
-        std::sort(fit.begin(), fit.end());
+        std::vector<double> fitness(population.size());
+        for (size_t k = 0; k < population.size(); ++k)
+            fitness[k] = objective(quad, data, space, population[k].point, sf,
+                                   st, joint);
 
-        VectorXd zmean = VectorXd::Zero(N), ymean = VectorXd::Zero(N);
-        mean.setZero();
-        for (int i = 0; i < mu; ++i)
+        std::vector<int> ranked = rankByFitness(fitness);
+        optimizer.update(population, ranked, gen);
+
+        int fittest = ranked[0];
+        if (fitness[fittest] < best_loss)
         {
-            int k = fit[i].second;
-            zmean += w[i] * zs[k];
-            ymean += w[i] * ys[k];
-            mean += w[i] * xs[k];
+            best_loss = fitness[fittest];
+            best_x = space.clamp(population[fittest].point);
         }
 
-        ps = (1 - cs) * ps + std::sqrt(cs * (2 - cs) * mueff) * (B * zmean);
-        double hsig =
-            ps.norm() / std::sqrt(1 - std::pow(1 - cs, 2.0 * (gen + 1))) / chiN <
-                    1.4 + 2.0 / (N + 1)
-                ? 1.0
-                : 0.0;
-        pc = (1 - cc) * pc + hsig * std::sqrt(cc * (2 - cc) * mueff) * ymean;
-
-        MatrixXd rank_mu = MatrixXd::Zero(N, N);
-        for (int i = 0; i < mu; ++i)
-            rank_mu += w[i] * ys[fit[i].second] * ys[fit[i].second].transpose();
-        C = (1 - c1 - cmu) * C +
-            c1 * (pc * pc.transpose() + (1 - hsig) * cc * (2 - cc) * C) +
-            cmu * rank_mu;
-        C = (C + C.transpose()) / 2;
-        sigma *= std::exp((cs / ds) * (ps.norm() / chiN - 1));
-
-        if (fit[0].first < best_f)
-        {
-            best_f = fit[0].first;
-            best_x = xs[fit[0].second].cwiseMax(xlo).cwiseMin(xhi);
-        }
-        log << gen << ',' << best_f;
-        for (int i = 0; i < N; ++i)
-            log << ',' << def[i] + best_x[i] * scale[i];
-        log << '\n';
-        log.flush();
+        logGeneration(log, gen, best_loss, space.params(best_x));
         if (gen % 10 == 0)
-            printf("gen %3d  loss %.5f  sigma %.4f\n", gen, best_f, sigma);
-        if (sigma < 1e-4)
+            printf("gen %3d  loss %.5f  sigma %.4f\n", gen, best_loss,
+                   optimizer.sigma());
+        if (optimizer.sigma() < SIGMA_STOP)
             break;
     }
-    log.close();
-    return toConfig(best_x);
+    return space.toConfig(best_x);
 }
 
-int main(int argc, char **argv)
+struct Args
 {
-    bool do_cma = false, joint = false, bad = false;
-    int N = 0;
+    const char *data = nullptr;
     const char *cfg = nullptr;
+    int N = 0;
+    bool do_cma = false, joint = false;
+};
+
+static bool parseArgs(int argc, char **argv, Args &a)
+{
+    if (argc < 2)
+        return false;
+    a.data = argv[1];
     for (int i = 2; i < argc; ++i)
     {
         std::string arg = argv[i];
         if (arg == "--cma" && i + 1 < argc)
-            do_cma = true, N = std::stoi(argv[++i]);
+        {
+            a.do_cma = true;
+            a.N = std::stoi(argv[++i]);
+        }
         else if (arg == "--joint")
-            joint = true;
-        else if (!cfg && arg[0] != '-')
-            cfg = argv[i];
+            a.joint = true;
+        else if (!a.cfg && !arg.empty() && arg[0] != '-')
+            a.cfg = argv[i];
         else
-            bad = true;
+            return false;
     }
-    if (argc < 2 || bad || (do_cma && (cfg || N < 1 || N > (int)REGISTRY.size())))
+    if (a.do_cma && (a.cfg || a.N < 1 || a.N > (int)REGISTRY.size()))
+        return false;
+    return true;
+}
+
+int main(int argc, char **argv)
+{
+    Args args;
+    if (!parseArgs(argc, argv, args))
     {
         fprintf(stderr,
                 "usage: %s data.csv [config.yaml] | data.csv --cma N [--joint]\n",
@@ -338,7 +505,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    std::vector<Sample> data = load(argv[1]);
+    std::vector<Sample> data = load(args.data);
     Quadcopter quad;
 
     double sf2 = 0, st2 = 0;
@@ -349,19 +516,20 @@ int main(int argc, char **argv)
     }
     double sf = std::sqrt(sf2 / data.size()), st = std::sqrt(st2 / data.size());
 
-    if (do_cma)
+    if (args.do_cma)
     {
         printf("loaded %zu rows | sf=%.3f st=%.4f | %d params free | %s\n",
-               data.size(), sf, st, N, joint ? "force+torque" : "force-only");
+               data.size(), sf, st, args.N,
+               args.joint ? "force+torque" : "force-only");
         printf("--- baseline (defaults) ---\n");
         report(quad, data, defaults());
         printf("--- CMA-ES ---\n");
         std::string outdir =
-            (std::filesystem::path(argv[1]).parent_path().parent_path() /
+            (std::filesystem::path(args.data).parent_path().parent_path() /
              "CMAES-results")
                 .string();
         std::map<std::string, double> best =
-            cma(quad, data, N, joint, sf, st, outdir);
+            cma(quad, data, args.N, args.joint, sf, st, outdir);
         std::ofstream out("best.yaml");
         writeYaml(out, best);
         printf("--- best (written to best.yaml) ---\n");
@@ -371,7 +539,7 @@ int main(int argc, char **argv)
     {
         try
         {
-            report(quad, data, cfg ? loadConfig(cfg) : defaults());
+            report(quad, data, args.cfg ? loadConfig(args.cfg) : defaults());
         }
         catch (const std::out_of_range &)
         {
