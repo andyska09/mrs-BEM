@@ -4,6 +4,7 @@
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Dense>
 #include <map>
+#include <ostream>
 #include <string>
 
 #define MODEL 1
@@ -128,6 +129,24 @@ struct Propeller_s {
     b = c.at("num_blades");
     A = M_PI * R * R;
   }
+
+  void log_params(std::ostream& o) const {
+    o << "bem:\n";
+#if !(MODEL == 1 && POLAR == 2)
+    o << "  lift_coefficient: " << cl << "\n";
+#endif
+    o << "  drag_coefficient: " << cd << "\n";
+    o << "  hinge_spring_constant: " << k << "\n";
+    o << "  pitch: " << toDeg(theta0) << "\n";
+    o << "  twist: " << toDeg(theta1) << "\n";
+    o << "  chord_inner: " << ci << "\n";
+    o << "  chord_outer: " << co << "\n";
+    o << "  radius: " << R << "\n";
+    o << "  lift_offset: " << cl_offset << "\n";
+    o << "  hforce_scale: " << hforce_scale << "\n";
+    o << "  num_blades: " << b << "\n";
+    o << "  air_density: " << rho << "\n";
+  }
 };
 
 struct Motor_s {
@@ -164,5 +183,19 @@ struct Quadcopter_s {
     Ax = c.at("frontarea_x");
     Ay = c.at("frontarea_y");
     Az = c.at("frontarea_z");
+  }
+
+  void log_params(std::ostream& o) const {
+    o << "quad:\n";
+    o << "  thrust_scale: " << thrust_scale << "\n";
+    o << "  dx: " << dx << "\n";
+    o << "  dy: " << dy << "\n";
+    o << "  dz: " << dz << "\n";
+    o << "body_drag:\n";
+    o << "  horizontal_drag_coefficient: " << cxy << "\n";
+    o << "  vertical_drag_coefficient: " << cz << "\n";
+    o << "  frontarea_x: " << Ax << "\n";
+    o << "  frontarea_y: " << Ay << "\n";
+    o << "  frontarea_z: " << Az << "\n";
   }
 };

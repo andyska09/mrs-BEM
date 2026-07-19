@@ -28,6 +28,11 @@ Simulator::Simulator(const char* infile, const char* outfile,
       exit(1);
     }
   }
+  std::string out(outfile);
+  size_t slash = out.find_last_of('/');
+  quad.log_params((slash == std::string::npos ? "" : out.substr(0, slash + 1)) +
+                  "params.yaml");
+
   std::vector<double> data(nCol + 6, 0);
 
   Eigen::Vector3d ang_acc;

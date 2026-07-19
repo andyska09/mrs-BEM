@@ -41,6 +41,7 @@ class Propeller {
   bool setVelocity(const Eigen::Vector3d velocity);
   bool setAttitudeRate(const Eigen::Vector3d att_rate);
   void load(const std::map<std::string, double>& config);
+  const Propeller_s& getParams() const { return param; }
 
   void printInfo();
 

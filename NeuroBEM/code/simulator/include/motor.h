@@ -23,6 +23,7 @@ class Motor {
   Eigen::Vector3d getOffset();
   void setOffset(const Eigen::Vector3d offset);
   void load(const std::map<std::string, double>& config);
+  const Propeller_s& getParams() const { return p.getParams(); }
   void printInfo(const int num = 0);
 
  private:

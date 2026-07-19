@@ -1,5 +1,8 @@
 #include "quadcopter.h"
 
+#include <fstream>
+#include <iomanip>
+
 /* To use OpenMP on Eigen::Vector3d Types one needs to define a custom
  * reduction operation. Otherwise OpenMP can't be used with Eigen */
 #pragma omp declare reduction(+:Eigen::Vector3d: omp_out=omp_out+omp_in) \
@@ -31,6 +34,14 @@ void Quadcopter::load(const std::map<std::string, double>& config) {
   _placeMotors();
   for (Motor& m : motors) m.load(config);
   _valid = false;
+}
+
+void Quadcopter::log_params(const std::string& path) const {
+  std::ofstream o(path);
+  if (!o) return;
+  o << std::setprecision(10);
+  motors[0].getParams().log_params(o);
+  param.log_params(o);
 }
 
 /* Internal function to update the state of the class */

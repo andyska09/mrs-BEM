@@ -29,6 +29,7 @@ class Quadcopter {
   Eigen::Vector3d getDrag();
   Eigen::Vector3d getForce();
   void load(const std::map<std::string, double>& config);
+  void log_params(const std::string& path) const;
   void printInfo(const bool detailed = false);
 
  private:
