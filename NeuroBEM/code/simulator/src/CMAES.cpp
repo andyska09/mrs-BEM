@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include <omp.h>
+
 #include <eigen3/Eigen/Dense>
 
 #include "config.h"
@@ -34,6 +36,10 @@ using Eigen::VectorXd;
 static constexpr double MASS = 0.772;
 static const Vector3d INERTIA{0.00254, 0.00214, 0.00436};
 static constexpr int MAXGEN = 100;
+static constexpr int NUM_THREADS = 12; // threads for the sample-parallel fitness
+
+#pragma omp declare reduction(+ : Array3d : omp_out += omp_in) \
+    initializer(omp_priv = Array3d::Zero())
 
 struct ParamSpec
 {
@@ -167,33 +173,43 @@ static std::vector<Sample> load(const std::string &path)
     return out;
 }
 
-static void mse(Quadcopter &quad, const std::vector<Sample> &data,
-                Array3d &fmse, Array3d &tmse)
+// BEM force/torque MSE over `data` at `config`, parallelized across samples
+// with one Quadcopter per thread (each loads `config` into its own copy).
+static void mse(std::vector<Quadcopter> &fleet,
+                const std::map<std::string, double> &config,
+                const std::vector<Sample> &data, Array3d &fmse, Array3d &tmse)
 {
     Array3d fse = Array3d::Zero(), tse = Array3d::Zero();
-    for (const Sample &s : data)
+#pragma omp parallel reduction(+ : fse, tse)
     {
-        quad.setAcceleration(flu2frd(s.acc));
-        quad.setVelocity(flu2frd(s.vel));
-        quad.setPosition(flu2frd(s.pos));
-        quad.setAngularAcceleration(flu2frd(s.ang_acc));
-        quad.setAngularVelocity(flu2frd(s.ang_vel));
-        quad.setQuaternionAttitude(flu2frd(s.quat));
-        quad.setMotorOmega(s.omega);
-        fse += (frd2flu(quad.getForce()) - s.fmeas).array().square();
-        tse += (frd2flu(quad.getTorque()) - s.tmeas).array().square();
+        Quadcopter &quad = fleet[omp_get_thread_num()];
+        quad.load(config);
+#pragma omp for nowait
+        for (size_t i = 0; i < data.size(); ++i)
+        {
+            const Sample &s = data[i];
+            quad.setAcceleration(flu2frd(s.acc));
+            quad.setVelocity(flu2frd(s.vel));
+            quad.setPosition(flu2frd(s.pos));
+            quad.setAngularAcceleration(flu2frd(s.ang_acc));
+            quad.setAngularVelocity(flu2frd(s.ang_vel));
+            quad.setQuaternionAttitude(flu2frd(s.quat));
+            quad.setMotorOmega(s.omega);
+            fse += (frd2flu(quad.getForce()) - s.fmeas).array().square();
+            tse += (frd2flu(quad.getTorque()) - s.tmeas).array().square();
+        }
     }
     fmse = fse / data.size();
     tmse = tse / data.size();
 }
 
-static double loss(Quadcopter &quad, const std::vector<Sample> &data,
+static double loss(std::vector<Quadcopter> &fleet,
+                   const std::vector<Sample> &data,
                    const std::map<std::string, double> &config, double sf,
                    double st, bool joint)
 {
-    quad.load(config);
     Array3d fm, tm;
-    mse(quad, data, fm, tm);
+    mse(fleet, config, data, fm, tm);
     double l = fm.sum() / (sf * sf);
     if (joint)
         l += tm.sum() / (st * st);
@@ -201,13 +217,12 @@ static double loss(Quadcopter &quad, const std::vector<Sample> &data,
 }
 
 // Table-II-style RMSE row: {Fxy, Fz, F, Mxy, Mz, M}.
-static std::array<double, 6> report(Quadcopter &quad,
+static std::array<double, 6> report(std::vector<Quadcopter> &fleet,
                                     const std::vector<Sample> &data,
                                     const std::map<std::string, double> &config)
 {
-    quad.load(config);
     Array3d fm, tm;
-    mse(quad, data, fm, tm);
+    mse(fleet, config, data, fm, tm);
     std::array<double, 6> m = {
         std::sqrt((fm[0] + fm[1]) / 2), std::sqrt(fm[2]), std::sqrt(fm.sum() / 3),
         std::sqrt((tm[0] + tm[1]) / 2), std::sqrt(tm[2]), std::sqrt(tm.sum() / 3)};
@@ -432,11 +447,12 @@ static std::ofstream openLog(const std::string &rundir,
     return log;
 }
 
-static double objective(Quadcopter &quad, const std::vector<Sample> &data,
+static double objective(std::vector<Quadcopter> &fleet,
+                        const std::vector<Sample> &data,
                         const SearchSpace &space, const VectorXd &x, double sf,
                         double st, bool joint)
 {
-    double value = loss(quad, data, space.toConfig(space.clamp(x)), sf, st,
+    double value = loss(fleet, data, space.toConfig(space.clamp(x)), sf, st,
                         joint) +
                    PENALTY * space.penalty(x);
     return std::isfinite(value) ? value : 1e12;
@@ -463,7 +479,7 @@ static void logGeneration(std::ofstream &log, int gen, double loss,
     log.flush();
 }
 
-static std::map<std::string, double> cma(Quadcopter &quad,
+static std::map<std::string, double> cma(std::vector<Quadcopter> &fleet,
                                          const std::vector<Sample> &data,
                                          const std::vector<int> &idx, bool joint,
                                          double sf, double st,
@@ -482,7 +498,7 @@ static std::map<std::string, double> cma(Quadcopter &quad,
 
         std::vector<double> fitness(population.size());
         for (size_t k = 0; k < population.size(); ++k)
-            fitness[k] = objective(quad, data, space, population[k].point, sf,
+            fitness[k] = objective(fleet, data, space, population[k].point, sf,
                                    st, joint);
 
         std::vector<int> ranked = rankByFitness(fitness);
@@ -560,7 +576,12 @@ int main(int argc, char **argv)
     }
 
     std::vector<Sample> data = load(args.data);
-    Quadcopter quad;
+
+    // Fitness is parallelized across samples; keep each Quadcopter's per-prop
+    // OpenMP loop serial so it doesn't oversubscribe inside that region.
+    omp_set_num_threads(NUM_THREADS);
+    omp_set_max_active_levels(1);
+    std::vector<Quadcopter> fleet(omp_get_max_threads());
 
     double sf2 = 0, st2 = 0;
     for (const Sample &s : data)
@@ -580,7 +601,7 @@ int main(int argc, char **argv)
             printf(" %s", REGISTRY[i].key);
         printf("\n");
         printf("--- baseline (defaults) ---\n");
-        report(quad, data, defaults());
+        report(fleet, data, defaults());
         printf("--- CMA-ES ---\n");
         std::string rundir =
             (std::filesystem::path(args.data).parent_path().parent_path() /
@@ -588,13 +609,13 @@ int main(int argc, char **argv)
                 .string();
         std::filesystem::create_directories(rundir);
         std::map<std::string, double> best =
-            cma(quad, data, args.free, args.joint, sf, st, rundir);
+            cma(fleet, data, args.free, args.joint, sf, st, rundir);
         std::ofstream yaml(rundir + "/best.yaml");
         writeYaml(yaml, best);
         std::ofstream txt(rundir + "/coeff.txt");
         writeCoeffTxt(txt, args.free, args.joint);
         printf("--- best (written to %s) ---\n", rundir.c_str());
-        std::array<double, 6> bestm = report(quad, data, best);
+        std::array<double, 6> bestm = report(fleet, data, best);
         std::ofstream metrics(rundir + "/metrics.csv");
         writeMetrics(metrics, bestm);
     }
@@ -602,7 +623,7 @@ int main(int argc, char **argv)
     {
         try
         {
-            report(quad, data, args.cfg ? loadConfig(args.cfg) : defaults());
+            report(fleet, data, args.cfg ? loadConfig(args.cfg) : defaults());
         }
         catch (const std::out_of_range &)
         {
