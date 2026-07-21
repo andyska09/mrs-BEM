@@ -48,7 +48,6 @@ struct ParamSpec
     double def, lo, hi; // defaults must match params.h; pitch/twist in degrees
 };
 
-// ordered by optimization priority: --cma N frees the first N entries.
 // `section` groups the key in the emitted YAML (single source of truth).
 static const std::vector<ParamSpec> REGISTRY = {
     {"lift_coefficient", "bem", 15.24214, 0.5, 40},
@@ -70,7 +69,7 @@ static const std::vector<ParamSpec> REGISTRY = {
     {"frontarea_x", "body_drag", 0.06 * 0.09, 0, 0.03},
     {"frontarea_y", "body_drag", 0.1 * 0.09, 0, 0.03},
     {"frontarea_z", "body_drag", 0.1 * 0.06, 0, 0.03},
-    // load-only tail: keep N below these so they stay at default
+    // load-only tail: leave these mask bits at 0 so they stay at default
     {"num_blades", "bem", 3, 2, 4},
     {"air_density", "bem", 1.204, 1.0, 1.4},
 };
