@@ -9,8 +9,8 @@ from scipy import signal
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "processed_data"
-BEM_DIR = DATA_DIR / "bem-tuned"
-BEM_PREFIX = "bem-tuned"  # file prefix inside BEM_DIR; "bem" for the other tunes
+BEM_DIR = DATA_DIR / "2026-07-15-00-00-00"
+BEM_PREFIX = "bem-01"  # file prefix inside BEM_DIR; "bem" for the other tunes
 FS = 400.0
 
 MASS = 0.772
