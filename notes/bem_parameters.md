@@ -66,55 +66,57 @@ Under `MODEL==0`, `cl`/`cd` are reused as quadratic thrust/torque coefficients
 | Maple coefficient blobs | calculate*.cpp | linear polar, kβ, e, Ib, Mb, θ0, θ1, chord, ρ, R all baked → untunable without re-derivation |
 | Ω cutoffs (<10→vi=0, <1→mu=0), ε=1e-6, qags tol 1e-3, v1 brackets −5/20→−20/30 | [gslHelper.cpp:27,66-68](../NeuroBEM/code/simulator/src/simulator/gslHelper.cpp#L27), [propeller.cpp:81,103-104](../NeuroBEM/code/simulator/src/simulator/propeller.cpp#L81) | numerics — keep fixed |
 
-## Structural facts that shape the optimization
 
-1. **Flapping/coning are frozen.** Their only inputs are Ω, mu, alpha, vind, p, q — no tunable reaches
-   them. Tuning θ0/θ1/chord creates integrand-vs-flapping inconsistency; the paper's own code already
-   has this for cl/cd/k ([bem_limitations.md](bem_limitations.md) #7).
-2. **Flapping never re-enters the integrals.** T/Q/H and vi are integrated with a0=a1s=b1s=0:
-   `setPropellerState` is called with 7 args, angle defaults 0
-   ([propeller.cpp:21,38,55](../NeuroBEM/code/simulator/src/simulator/propeller.cpp#L21),
-   [gslHelper.h:57-59](../NeuroBEM/code/simulator/include/gslHelper.h#L57)), so the β/U_P flapping terms
-   [gslHelper.cpp:179-183](../NeuroBEM/code/simulator/src/simulator/gslHelper.cpp#L179) are dead.
-   Paper algorithm step 4 (re-evaluate (13)–(15) *with* the angles,
-   [RSS21_Bauersfeld.md:337](../papers/RSS21_Bauersfeld.md#L337)) is **not implemented** — plumbing exists,
-   candidate paper-correctness toggle.
-3. **Degeneracies to expect:** `b`, `rho`, joint (ci,co), joint (cl,cd) scale all multiply T/Q/H
-   identically; `k` is a pure gain on Mxy; only `cxy·A` products are identifiable. A fully-free run
-   will sit in flat valleys → fix physical constants (R, b, rho, g), tune shapes/ratios, keep bounds.
-4. **Current CMA-ES** ([CMAES.cpp](../NeuroBEM/code/simulator/src/CMAES.cpp)): hand-rolled, N=2 (cl,cd),
-   k fixed, force-only normalized loss `Σfmse/sf²` [CMAES.cpp:81-87](../NeuroBEM/code/simulator/src/CMAES.cpp#L81),
-   normalized coords x=param/default, box [0.05,5], λ=8, μ=4, σ0=0.3, ≤200 gen, seed 0.
-   `st` is already computed [CMAES.cpp:202](../NeuroBEM/code/simulator/src/CMAES.cpp#L202) — joint loss is
-   `fm.sum()/sf² + tm.sum()/st²`.
-5. **Ground-truth constants** live in CMAES.cpp (MASS 0.772, INERTIA 0.00254/0.00214/0.00436) —
-   params.h inertia values on the README mass; consistent with [results.md](results.md) but not with
-   README's rounded [0.0025, 0.0021, 0.0043] used by make_nn_targets.py. Keep one convention when comparing.
-6. **Upstream bug:** [motor.cpp:24](../NeuroBEM/code/simulator/src/simulator/motor.cpp#L24)
-   `torque[3] -= isCW()·dOmega·inertia` — index 3 is out of bounds on `Vector3d` (should be 2), *and*
-   dOmega is never set (simulator.cpp reads the domega columns [simulator.cpp:49](../NeuroBEM/code/simulator/src/simulator/simulator.cpp#L49)
-   but never calls `setMotorAcceleration`; identical upstream at 126ed98). Numerically inert today, but UB.
-   Fix the index; leave domega unwired for paper parity (candidate later param: motor-inertia reaction torque).
-7. **Fuselage drag is part of "paper BEM".** Upstream always wrote `getForce()=drag+thrust`
-   (verified at import commit 126ed98) — the paper's Table II "BEM" numbers include the crude
-   cxy=cz=1 drag. Raw-BEM baseline keeps it.
-8. **Robustness/cost:** extreme params can break the vi bracket (printf + garbage
-   [gslHelper.cpp:66-74](../NeuroBEM/code/simulator/src/simulator/gslHelper.cpp#L66)) and inflate qags
-   runtime — the CMA-ES loss needs non-finite guards and sane bounds.
+## Where each param acts
 
-## Proposed tunable tiers
+**Core BEM integrand** ([gslHelper.cpp:187-220](../NeuroBEM/code/simulator/src/simulator/gslHelper.cpp#L187)):
 
-| tier | params | n | note |
-|---|---|---|---|
-| T0 raw re-tune | cl, cd, k | 3 | joint force+torque loss; extends `bem-tuned` |
-| T1 blade | + theta0, theta1, ci, co | 7 | shape via co/ci; watch scale degeneracy with cl/cd |
-| T2 corrections | + cl_offset(0), hforce_scale(1), thrust_scale(1) | 10 | agilicious set as free params, neutral defaults = raw BEM |
-| T3 assembly/body | + dx, dy, dz, cxy·Ax, cxy·Ay, cz·Az | 16 | torque levers + body drag |
-| fixed | rho, R, b, A, g, mass/inertia, numerics, VRS quartic | — | measured constants / target-side / degenerate |
+```
+α  = θ0 + θ1·(r/R) + φ            # pitch, twist, radius
+cl = cl·(sinα·cosα + cl_offset)  # lift_coefficient, lift_offset
+cd = cd·sin²α                    # drag_coefficient
+c  = ci + (r/R)·(co − ci)        # chord_inner, chord_outer, radius
+dL = U²·cl·c ,  dD = U²·cd·c
+T  += dL·cosφ + dD·sinφ          # thrust
+Q  += r·(−dL·sinφ + dD·cosφ)     # torque
+H  += sinΨ·(−dL·sinφ + dD·cosφ)  # hforce
+```
 
-## Code state (2026-07-16)
+**Assembly:**
 
-Working tree = `bem-agi` configuration: `+0.07` and `×3.0` live (commit e39651d),
-[applyBM.sh:8-9](../NeuroBEM/code/Scripts/applyBM.sh#L8) passes cl=4.797, cd=4.169.
-Revert both lines + applyBM defaults before regenerating any raw-BEM baseline
-(see warning in [results.md](results.md)).
+- `thrust[2] *= thrust_scale` ([quadcopter.cpp:155](../NeuroBEM/code/simulator/src/simulator/quadcopter.cpp#L155)) — only the summed vertical force.
+- `hforce = hforce_scale · H` ([propeller.cpp:115](../NeuroBEM/code/simulator/src/simulator/propeller.cpp#L115)) — in-plane force.
+- `torqueVec = {k·b1s, k·a1s, −Q}` ([propeller.cpp:135](../NeuroBEM/code/simulator/src/simulator/propeller.cpp#L135)) — kβ scales roll/pitch torque; cd (via Q) drives yaw torque.
+- `torque += offset × thrust` ([quadcopter.cpp:166](../NeuroBEM/code/simulator/src/simulator/quadcopter.cpp#L166)) — dx, dy, dz are the moment arms.
+- Body drag ([quadcopter.cpp:175-177](../NeuroBEM/code/simulator/src/simulator/quadcopter.cpp#L175)): `drag = {cxy·Ax·…, cxy·Ay·…, cz·Az·…}`.
+- Induced velocity ([propeller.cpp:97](../NeuroBEM/code/simulator/src/simulator/propeller.cpp#L97)): `vi = √(T/(2ρA))`, `A = πR²`.
+
+## Linear dependencies (collinear groups)
+
+### Group 1 — vertical-thrust magnitude (the worst degeneracy)
+
+All multiply T_z ≈ linearly:
+
+- **lift_coefficient (cl)** — multiplies dL directly.
+- **thrust_scale** — post-multiplies thrust[2]. Near-exact duplicate of cl for force-z.
+- **chord_inner, chord_outer** — dL ∝ c; the mean (ci+co) is collinear with cl, only the slope (co−ci) is a separate (weakly-excited) shape DOF.
+- **radius (R)** — scales thrust via A=πR² and the integration domain r∈[0,R]; another magnitude knob on top of cl.
+
+→ cl, thrust_scale, (ci+co), R are ~one effective direction. Freeing more than one without an anchor gives a flat ridge. **Caveat:** cl also enters torque and hforce, so under `--joint` it's partially pinned by torque while thrust_scale/R/chord stay pure-force — that only softens the ridge, doesn't remove it.
+
+### Group 2 — angle-of-attack shape (soft, nonlinear collinearity with cl)
+
+- **pitch (θ0), twist (θ1)** — shift α; since sinα·cosα ≈ α at small α, raising θ0 ≈ raising cl. θ0/θ1 differ only in radial weighting (r/R), and separate from cl only through polar curvature — weak unless the data spans a wide α range.
+- **lift_offset (cl_offset)** — adds an α-independent term inside the same cl·(…); correlated with cl scale, separable only by polar shape.
+
+### Group 3 — body drag (exact products)
+
+- **vertical_drag_coefficient (cz) × frontarea_z (Az):** drag_z = cz·Az·… → perfectly collinear, only the product cz·Az is identifiable. Never free both.
+- **horizontal_drag_coefficient (cxy)** shared by x and y × frontarea_x/y: only cxy·Ax and cxy·Ay are identifiable → 3 params, 2 DOF. cxy's overall scale is not separable from (Ax, Ay).
+- Whole block competes with hforce_scale for horizontal-velocity-dependent force → cross-collinear too.
+
+### Group 4 — the well-conditioned ones (free these)
+
+- **hinge_spring_constant (kβ)** — clean multiplier on roll/pitch torque only; independent of everything above. Needs `--joint`.
+- **drag_coefficient (cd)** — dominant yaw-torque / drag scale; barely touches force → needs `--joint` or it floats.
+- **dx, dy, dz** — geometric moment arms; independent of aero but overlap mildly with kβ/cd on torque, and need asymmetric (yaw/roll) maneuvers to excite.
