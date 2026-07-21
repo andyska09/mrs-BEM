@@ -188,10 +188,12 @@ static void report(Quadcopter &quad, const std::vector<Sample> &data,
     quad.load(config);
     Array3d fm, tm;
     mse(quad, data, fm, tm);
-    Array3d fr = fm.sqrt(), tr = tm.sqrt();
     writeYaml(std::cout, config);
-    printf("force  RMSE: %.4f %.4f %.4f\n", fr[0], fr[1], fr[2]);
-    printf("torque RMSE: %.5f %.5f %.5f\n", tr[0], tr[1], tr[2]);
+    printf("           xy       z        total\n");
+    printf("force  %8.4f %8.4f %8.4f  [N]\n", std::sqrt((fm[0] + fm[1]) / 2),
+           std::sqrt(fm[2]), std::sqrt(fm.sum() / 3));
+    printf("torque %8.5f %8.5f %8.5f  [Nm]\n", std::sqrt((tm[0] + tm[1]) / 2),
+           std::sqrt(tm[2]), std::sqrt(tm.sum() / 3));
 }
 
 // ---- generic (N,1)-CMA-ES over an unbounded x-space -----------------------
