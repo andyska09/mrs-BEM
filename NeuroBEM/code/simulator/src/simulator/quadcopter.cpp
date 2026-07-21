@@ -17,7 +17,6 @@ Quadcopter::Quadcopter() {
   motors.emplace_back(Eigen::Vector3d::Zero(), false);
   motors.emplace_back(Eigen::Vector3d::Zero(), true);
   _placeMotors();
-  omp_set_num_threads(motors.size());
 }
 
 Quadcopter::~Quadcopter() {}
