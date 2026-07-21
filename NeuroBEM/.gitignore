@@ -3,6 +3,7 @@ bem+nn/
 processed_data/
 raw_data/
 pdf/
+CMAES-results/
 
 # === Reference paper (large binary, available externally) ===
 RSS21_Bauersfeld.pdf

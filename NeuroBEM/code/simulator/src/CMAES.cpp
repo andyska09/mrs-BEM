@@ -4,9 +4,9 @@
 //   ./cmaes data.csv --cma MASK [--joint]  fit the registry params selected by
 //                                        the binary MASK (one bit per REGISTRY
 //                                        entry, e.g. 111 = cl,cd,k; trailing
-//                                        bits default to 0/fixed), writes
-//                                        best_<ts>.yaml + convergence_<ts>.csv
+//                                        bits default to 0/fixed)
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <ctime>
@@ -93,14 +93,17 @@ static void writeYaml(std::ostream &os, const std::map<std::string, double> &c)
     }
 }
 
-// Flat run record: line 1 = bitmask (one bit per REGISTRY entry), then the name
-// of each optimized (freed) param, one per line.
-static void writeCoeffTxt(std::ostream &os, const std::vector<int> &free)
+// Flat run record: line 1 = bitmask (one bit per REGISTRY entry), line 2 =
+// objective ("force+torque" or "force-only"), then the name of each optimized
+// (freed) param, one per line.
+static void writeCoeffTxt(std::ostream &os, const std::vector<int> &free,
+                          bool joint)
 {
     std::string mask(REGISTRY.size(), '0');
     for (int i : free)
         mask[i] = '1';
     os << mask << '\n';
+    os << (joint ? "force+torque" : "force-only") << '\n';
     for (int i : free)
         os << REGISTRY[i].key << '\n';
 }
@@ -197,18 +200,32 @@ static double loss(Quadcopter &quad, const std::vector<Sample> &data,
     return l;
 }
 
-static void report(Quadcopter &quad, const std::vector<Sample> &data,
-                   const std::map<std::string, double> &config)
+// Table-II-style RMSE row: {Fxy, Fz, F, Mxy, Mz, M}.
+static std::array<double, 6> report(Quadcopter &quad,
+                                    const std::vector<Sample> &data,
+                                    const std::map<std::string, double> &config)
 {
     quad.load(config);
     Array3d fm, tm;
     mse(quad, data, fm, tm);
+    std::array<double, 6> m = {
+        std::sqrt((fm[0] + fm[1]) / 2), std::sqrt(fm[2]), std::sqrt(fm.sum() / 3),
+        std::sqrt((tm[0] + tm[1]) / 2), std::sqrt(tm[2]), std::sqrt(tm.sum() / 3)};
     writeYaml(std::cout, config);
     printf("           xy       z        total\n");
-    printf("force  %8.4f %8.4f %8.4f  [N]\n", std::sqrt((fm[0] + fm[1]) / 2),
-           std::sqrt(fm[2]), std::sqrt(fm.sum() / 3));
-    printf("torque %8.5f %8.5f %8.5f  [Nm]\n", std::sqrt((tm[0] + tm[1]) / 2),
-           std::sqrt(tm[2]), std::sqrt(tm.sum() / 3));
+    printf("force  %8.4f %8.4f %8.4f  [N]\n", m[0], m[1], m[2]);
+    printf("torque %8.5f %8.5f %8.5f  [Nm]\n", m[3], m[4], m[5]);
+    return m;
+}
+
+// metrics.csv: the best config's reported RMSE
+static void writeMetrics(std::ostream &os, const std::array<double, 6> &best)
+{
+    os << std::setprecision(6);
+    os << "Fxy,Fz,F,Mxy,Mz,M\n";
+    for (size_t i = 0; i < best.size(); ++i)
+        os << (i ? "," : "") << best[i];
+    os << '\n';
 }
 
 // ---- generic (N,1)-CMA-ES over an unbounded x-space -----------------------
@@ -401,11 +418,11 @@ static std::string timestamp()
     return ts;
 }
 
-// Opens outdir/convergence_<ts>.csv with a "gen,loss,<param...>" header.
-static std::ofstream openLog(const std::string &outdir, const std::string &ts,
+// Opens rundir/convergence.csv with a "gen,loss,<param...>" header.
+static std::ofstream openLog(const std::string &rundir,
                              const std::vector<int> &idx)
 {
-    std::string path = outdir + "/convergence_" + ts + ".csv";
+    std::string path = rundir + "/convergence.csv";
     printf("logging to %s\n", path.c_str());
     std::ofstream log(path);
     log << "gen,loss";
@@ -450,12 +467,11 @@ static std::map<std::string, double> cma(Quadcopter &quad,
                                          const std::vector<Sample> &data,
                                          const std::vector<int> &idx, bool joint,
                                          double sf, double st,
-                                         const std::string &outdir,
-                                         const std::string &ts)
+                                         const std::string &rundir)
 {
     SearchSpace space(idx);
     Cma optimizer((int)idx.size());
-    std::ofstream log = openLog(outdir, ts, idx);
+    std::ofstream log = openLog(rundir, idx);
 
     VectorXd best_x = optimizer.mean();
     double best_loss = 1e18;
@@ -566,20 +582,21 @@ int main(int argc, char **argv)
         printf("--- baseline (defaults) ---\n");
         report(quad, data, defaults());
         printf("--- CMA-ES ---\n");
-        std::string outdir =
+        std::string rundir =
             (std::filesystem::path(args.data).parent_path().parent_path() /
-             "CMAES-results")
+             "CMAES-results" / timestamp())
                 .string();
-        std::string ts = timestamp();
+        std::filesystem::create_directories(rundir);
         std::map<std::string, double> best =
-            cma(quad, data, args.free, args.joint, sf, st, outdir, ts);
-        std::string best_path = outdir + "/best_" + ts + ".yaml";
-        std::ofstream out(best_path);
-        writeYaml(out, best);
-        std::ofstream txt(outdir + "/coeff_" + ts + ".txt");
-        writeCoeffTxt(txt, args.free);
-        printf("--- best (written to %s) ---\n", best_path.c_str());
-        report(quad, data, best);
+            cma(quad, data, args.free, args.joint, sf, st, rundir);
+        std::ofstream yaml(rundir + "/best.yaml");
+        writeYaml(yaml, best);
+        std::ofstream txt(rundir + "/coeff.txt");
+        writeCoeffTxt(txt, args.free, args.joint);
+        printf("--- best (written to %s) ---\n", rundir.c_str());
+        std::array<double, 6> bestm = report(quad, data, best);
+        std::ofstream metrics(rundir + "/metrics.csv");
+        writeMetrics(metrics, bestm);
     }
     else
     {

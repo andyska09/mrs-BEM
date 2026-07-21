@@ -5,8 +5,8 @@
 # file that supplies a list of names to be converted
 
 programPath="../simulator/build/bem-model"
-model="bem"
-config=""   # path to a config yaml (see simulator/bem_config.yaml); empty = compile-time defaults
+model="bem-02"
+config="../../CMAES-results/best_2026-07-21-14-54-19.yaml"   # path to a config yaml (see simulator/bem_config.yaml); empty = compile-time defaults
 
 if [ "$1" != "" ]
 then
