@@ -1,8 +1,11 @@
 // CMA-ES BEM parameter fit on normalized force (+ optionally torque) MSE.
 //   ./cmaes data.csv                 report at compile-time defaults
 //   ./cmaes data.csv config.yaml     report at given config
-//   ./cmaes data.csv --cma N [--joint]   fit the first N registry params,
-//                                        writes best.yaml + convergence.csv
+//   ./cmaes data.csv --cma MASK [--joint]  fit the registry params selected by
+//                                        the binary MASK (one bit per REGISTRY
+//                                        entry, e.g. 111 = cl,cd,k; trailing
+//                                        bits default to 0/fixed), writes
+//                                        best_<ts>.yaml + convergence_<ts>.csv
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -30,7 +33,7 @@ using Eigen::VectorXd;
 
 static constexpr double MASS = 0.772;
 static const Vector3d INERTIA{0.00254, 0.00214, 0.00436};
-static constexpr int MAXGEN = 300;
+static constexpr int MAXGEN = 100;
 
 struct ParamSpec
 {
@@ -88,6 +91,18 @@ static void writeYaml(std::ostream &os, const std::map<std::string, double> &c)
             if (std::string(p.section) == section)
                 os << "  " << p.key << ": " << c.at(p.key) << '\n';
     }
+}
+
+// Flat run record: line 1 = bitmask (one bit per REGISTRY entry), then the name
+// of each optimized (freed) param, one per line.
+static void writeCoeffTxt(std::ostream &os, const std::vector<int> &free)
+{
+    std::string mask(REGISTRY.size(), '0');
+    for (int i : free)
+        mask[i] = '1';
+    os << mask << '\n';
+    for (int i : free)
+        os << REGISTRY[i].key << '\n';
 }
 
 struct Sample
@@ -333,19 +348,22 @@ private:
 static constexpr double SIGMA_STOP = 1e-4;
 static constexpr double PENALTY = 1e3;
 
-// Maps CMA-ES's unbounded x-space onto the bounded BEM params of the first N
-// registry entries (x=0 -> default, |x|=1 -> a bound), with a soft box.
+// Maps CMA-ES's unbounded x-space onto the bounded BEM params of the selected
+// registry entries `idx` (x=0 -> default, |x|=1 -> a bound), with a soft box.
 class SearchSpace
 {
 public:
-    explicit SearchSpace(int n) : n_(n), def_(n), scale_(n), xlo_(n), xhi_(n)
+    explicit SearchSpace(const std::vector<int> &idx)
+        : idx_(idx), def_(idx.size()), scale_(idx.size()), xlo_(idx.size()),
+          xhi_(idx.size())
     {
-        for (int i = 0; i < n_; ++i)
+        for (size_t i = 0; i < idx_.size(); ++i)
         {
-            def_[i] = REGISTRY[i].def;
-            scale_[i] = (REGISTRY[i].hi - REGISTRY[i].lo) / 2;
-            xlo_[i] = (REGISTRY[i].lo - def_[i]) / scale_[i];
-            xhi_[i] = (REGISTRY[i].hi - def_[i]) / scale_[i];
+            const ParamSpec &p = REGISTRY[idx_[i]];
+            def_[i] = p.def;
+            scale_[i] = (p.hi - p.lo) / 2;
+            xlo_[i] = (p.lo - def_[i]) / scale_[i];
+            xhi_[i] = (p.hi - def_[i]) / scale_[i];
         }
     }
 
@@ -365,27 +383,33 @@ public:
     {
         std::map<std::string, double> c = defaults();
         VectorXd p = params(x);
-        for (int i = 0; i < n_; ++i)
-            c[REGISTRY[i].key] = p[i];
+        for (size_t i = 0; i < idx_.size(); ++i)
+            c[REGISTRY[idx_[i]].key] = p[i];
         return c;
     }
 
 private:
-    int n_;
+    std::vector<int> idx_;
     VectorXd def_, scale_, xlo_, xhi_;
 };
 
-// Opens outdir/convergence_<timestamp>.csv with a "gen,loss,<param...>" header.
-static std::ofstream openLog(const std::string &outdir, int N)
+static std::string timestamp()
 {
     char ts[32];
     std::time_t now = std::time(nullptr);
     std::strftime(ts, sizeof(ts), "%Y-%m-%d-%H-%M-%S", std::localtime(&now));
+    return ts;
+}
+
+// Opens outdir/convergence_<ts>.csv with a "gen,loss,<param...>" header.
+static std::ofstream openLog(const std::string &outdir, const std::string &ts,
+                             const std::vector<int> &idx)
+{
     std::string path = outdir + "/convergence_" + ts + ".csv";
     printf("logging to %s\n", path.c_str());
     std::ofstream log(path);
     log << "gen,loss";
-    for (int i = 0; i < N; ++i)
+    for (int i : idx)
         log << ',' << REGISTRY[i].key;
     log << '\n';
     return log;
@@ -423,13 +447,15 @@ static void logGeneration(std::ofstream &log, int gen, double loss,
 }
 
 static std::map<std::string, double> cma(Quadcopter &quad,
-                                         const std::vector<Sample> &data, int N,
-                                         bool joint, double sf, double st,
-                                         const std::string &outdir)
+                                         const std::vector<Sample> &data,
+                                         const std::vector<int> &idx, bool joint,
+                                         double sf, double st,
+                                         const std::string &outdir,
+                                         const std::string &ts)
 {
-    SearchSpace space(N);
-    Cma optimizer(N);
-    std::ofstream log = openLog(outdir, N);
+    SearchSpace space(idx);
+    Cma optimizer((int)idx.size());
+    std::ofstream log = openLog(outdir, ts, idx);
 
     VectorXd best_x = optimizer.mean();
     double best_loss = 1e18;
@@ -467,7 +493,7 @@ struct Args
 {
     const char *data = nullptr;
     const char *cfg = nullptr;
-    int N = 0;
+    std::vector<int> free;
     bool do_cma = false, joint = false;
 };
 
@@ -482,7 +508,16 @@ static bool parseArgs(int argc, char **argv, Args &a)
         if (arg == "--cma" && i + 1 < argc)
         {
             a.do_cma = true;
-            a.N = std::stoi(argv[++i]);
+            std::string mask = argv[++i];
+            if (mask.size() > REGISTRY.size())
+                return false;
+            for (size_t j = 0; j < mask.size(); ++j)
+            {
+                if (mask[j] != '0' && mask[j] != '1')
+                    return false;
+                if (mask[j] == '1')
+                    a.free.push_back((int)j);
+            }
         }
         else if (arg == "--joint")
             a.joint = true;
@@ -491,7 +526,7 @@ static bool parseArgs(int argc, char **argv, Args &a)
         else
             return false;
     }
-    if (a.do_cma && (a.cfg || a.N < 1 || a.N > (int)REGISTRY.size()))
+    if (a.do_cma && (a.cfg || a.free.empty()))
         return false;
     return true;
 }
@@ -502,7 +537,8 @@ int main(int argc, char **argv)
     if (!parseArgs(argc, argv, args))
     {
         fprintf(stderr,
-                "usage: %s data.csv [config.yaml] | data.csv --cma N [--joint]\n",
+                "usage: %s data.csv [config.yaml] | data.csv --cma MASK "
+                "[--joint]\n",
                 argv[0]);
         return 1;
     }
@@ -520,9 +556,13 @@ int main(int argc, char **argv)
 
     if (args.do_cma)
     {
-        printf("loaded %zu rows | sf=%.3f st=%.4f | %d params free | %s\n",
-               data.size(), sf, st, args.N,
+        printf("loaded %zu rows | sf=%.3f st=%.4f | %zu params free | %s\n",
+               data.size(), sf, st, args.free.size(),
                args.joint ? "force+torque" : "force-only");
+        printf("free:");
+        for (int i : args.free)
+            printf(" %s", REGISTRY[i].key);
+        printf("\n");
         printf("--- baseline (defaults) ---\n");
         report(quad, data, defaults());
         printf("--- CMA-ES ---\n");
@@ -530,11 +570,15 @@ int main(int argc, char **argv)
             (std::filesystem::path(args.data).parent_path().parent_path() /
              "CMAES-results")
                 .string();
+        std::string ts = timestamp();
         std::map<std::string, double> best =
-            cma(quad, data, args.N, args.joint, sf, st, outdir);
-        std::ofstream out("best.yaml");
+            cma(quad, data, args.free, args.joint, sf, st, outdir, ts);
+        std::string best_path = outdir + "/best_" + ts + ".yaml";
+        std::ofstream out(best_path);
         writeYaml(out, best);
-        printf("--- best (written to best.yaml) ---\n");
+        std::ofstream txt(outdir + "/coeff_" + ts + ".txt");
+        writeCoeffTxt(txt, args.free);
+        printf("--- best (written to %s) ---\n", best_path.c_str());
         report(quad, data, best);
     }
     else
