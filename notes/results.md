@@ -8,8 +8,8 @@ Ground truth = `f=m·a`, `τ=I·α+ω×Iω` with mass 0.772, inertia [0.00254,0.
 | config | Fxy | Fz | Mxy | Mz | F | M |
 |---|---|---|---|---|---|---|
 | `bem` (baseline) | 0.575 | 1.663 | 0.127 | 0.015 | 1.069 | 0.104 |
-| `bem-01` | 0.577 | 1.612 | 0.124 | 0.015 | 1.043 | 0.102 |
-| `bem-02`² | 0.397 | 0.907 | 0.129 | 0.014 | 0.616 | 0.106 |
+| `2026-07-15-00-00-00` | 0.577 | 1.612 | 0.124 | 0.015 | 1.043 | 0.102 |
+| `2026-07-21-14-54-19`² | 0.397 | 0.907 | 0.129 | 0.014 | 0.616 | 0.106 |
 | **paper BEM** | 0.803 | 1.265 | 0.090 | 0.017 | 0.982 | 0.074 |
 | paper BEM+NN | 0.204 | 0.504 | 0.014 | 0.004 | 0.335 | 0.012 |
 
@@ -21,8 +21,8 @@ Ground truth = `f=m·a`, `τ=I·α+ω×Iω` with mass 0.772, inertia [0.00254,0.
 | folder | files | cols | cl | cd | k | extra | purpose |
 |---|---|---|---|---|---|---|---|
 | `bem` | full | 35 | 15.242 | 13.549 | 5.89 | — | canonical baseline, default identified params (params.h) |
-| `bem-01` | full | 35 | 14.329 | 14.454 | 5.89 | — | CMA-ES force-only fit (cl, cd) |
-| `bem-02` | test | 35 | 4.846 | 3.086 | 1.729 | +0.046 offset, ×2.65 h-force, pitch 27.0° | CMA-ES 6-param force-only fit (subset_20k) |
+| `2026-07-15-00-00-00` | full | 35 | 14.329 | 14.454 | 5.89 | — | CMA-ES force-only fit (cl, cd); files prefixed `bem-01_` |
+| `2026-07-21-14-54-19` | test | 35 | 4.846 | 3.086 | 1.729 | +0.046 offset, ×2.65 h-force, pitch 27.0° | CMA-ES 6-param force-only fit (subset_20k); matches `CMAES-results/2026-07-21-14-54-19` |
 
 ### Old runs
 
