@@ -13,6 +13,8 @@ GSLHelper::GSLHelper() {
   s = gsl_root_fsolver_alloc(T);
   p.wR = gsl_integration_workspace_alloc(p.gsl_int_size);
   p.wPsi = gsl_integration_workspace_alloc(p.gsl_int_size);
+  p.fPsi = new gsl_function{&integrandPsi, &p};
+  p.fR = new gsl_function{&integrandR, &p};
 }
 
 /* Destructor for GSL Solver/Integrator Class */
@@ -20,6 +22,8 @@ GSLHelper::~GSLHelper() {
   gsl_root_fsolver_free(s);
   gsl_integration_workspace_free(p.wPsi);
   gsl_integration_workspace_free(p.wR);
+  delete p.fPsi;
+  delete p.fR;
 }
 
 /* Uses gsl_root_fsolver to solve the implicit equation that determines
@@ -27,14 +31,6 @@ GSLHelper::~GSLHelper() {
 double GSLHelper::solveInducedVelocity() {
   if (std::abs(p.Omega) < 10) return 0;
   p.type = THRUST;
-  p.fPsi = new gsl_function;
-  p.fPsi->function = &integrandPsi;
-  p.fPsi->params = (void*)&p;
-
-  p.fR = new gsl_function;
-  p.fR->function = &integrandR;
-  p.fR->params = (void*)&p;
-
   v1 = _findZero();
 
   if (p.vver / v1 >= 0 && p.vver / v1 <= 2) {
@@ -113,19 +109,10 @@ double GSLHelper::integrateHForce() {
 
 /* Internal function that prepares the memory for numerical integration */
 double GSLHelper::_integrate(double (*function)(double, void*)) {
-  p.fPsi = new gsl_function;
   p.fPsi->function = function;
-  p.fPsi->params = (void*)&p;
-
-  p.fR = new gsl_function;
-  p.fR->function = &integrandR;
-  p.fR->params = (void*)&p;
-
   double result, error;
   gsl_integration_qags(p.fR, 0, p.R, 0, 1e-3, p.gsl_int_size, p.wR, &result,
                        &error);
-  delete p.fPsi;
-  delete p.fR;
   return result;
 }
 
