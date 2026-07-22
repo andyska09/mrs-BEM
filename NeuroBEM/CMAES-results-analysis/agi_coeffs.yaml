@@ -1,0 +1,26 @@
+# Agilicious-identified BEM coeffs, read from agilicious/simulator source.
+# thrust_scale is loaded from a quad YAML not shipped in the extracted sources -> unknown (NaN).
+bem:
+  lift_coefficient: 4.797071        # model_propeller_bem_params.cpp:20
+  drag_coefficient: 4.168863        # model_propeller_bem_params.cpp:19
+  hinge_spring_constant: 5.89       # model_propeller_bem_params.cpp:21
+  lift_offset: 0.07                 # bem/functions.cpp:35  cl*(sinα·cosα + 0.07)
+  hforce_scale: 3.0                 # model_propeller_bem.cpp:87  *3.0
+  pitch: 22.95                      # theta0_=0.40055306 rad (params.cpp:12)
+  twist: -8.0                       # theta1_=-0.139626 rad (params.cpp:13)
+  chord_inner: 0.017                # ci_=1.7e-2 (params.cpp:15)
+  chord_outer: 0.008                # co_=0.8e-2 (params.cpp:16)
+  radius: 0.06477                   # r_prop_=6.477e-2 (params.cpp:9)
+  num_blades: 3                     # b_=3.0 (params.cpp:14)
+  air_density: 1.204                # rho_=1.204 (params.cpp:8)
+quad:
+  thrust_scale: .nan                # loaded from quad YAML (not in extracted sources)
+  dx: 0.078                         # geometry, same drone as NeuroBEM default
+  dy: 0.1
+  dz: 0.027
+body_drag:
+  horizontal_drag_coefficient: 1.0  # model_body_drag_params.cpp:6
+  vertical_drag_coefficient: 1.0
+  frontarea_x: 0.015                # ax_=1.5e-2 (model_body_drag_params.cpp:6)
+  frontarea_y: 0.015                # ay_=1.5e-2
+  frontarea_z: 0.030                # az_=3.0e-2
