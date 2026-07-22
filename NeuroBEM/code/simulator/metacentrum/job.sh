@@ -26,8 +26,7 @@ echo "============================="
 # find_package(Eigen3) must succeed via the module.
 module add cmake gcc gsl eigen
 
-cp -r "$SIMDIR"/{include,src,CMakeLists.txt,cmake,bem_config.yaml} "$SCRATCHDIR"/ 2>/dev/null || \
-  cp -r "$SIMDIR"/{include,src,CMakeLists.txt,cmake} "$SCRATCHDIR"/
+cp -r "$SIMDIR"/{include,src,CMakeLists.txt,bem_config.yaml} "$SCRATCHDIR"/
 mkdir -p "$SCRATCHDIR/CMAES-dataset"
 cp "$DATA" "$SCRATCHDIR/CMAES-dataset/data.csv"
 
