@@ -7,6 +7,7 @@
 //                                        cl,cd,k; trailing bits default to
 //                                        0/fixed). --loss picks the objective
 //                                        (default force).
+//   --threads N  sets the OpenMP thread count (default: OMP_NUM_THREADS / hw).
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -38,7 +39,6 @@ using Eigen::VectorXd;
 static constexpr double MASS = 0.772;
 static const Vector3d INERTIA{0.00254, 0.00214, 0.00436};
 static constexpr int MAXGEN = 100;
-static constexpr int NUM_THREADS = 12; // threads for the sample-parallel fitness
 
 #pragma omp declare reduction(+ : Array3d : omp_out += omp_in) \
     initializer(omp_priv = Array3d::Zero())
@@ -537,6 +537,7 @@ struct Args
     std::vector<int> free;
     bool do_cma = false;
     Obj obj = Obj::Force;
+    int threads = 0; // 0 = OpenMP default (OMP_NUM_THREADS / hardware)
 };
 
 static bool parseArgs(int argc, char **argv, Args &a)
@@ -573,6 +574,12 @@ static bool parseArgs(int argc, char **argv, Args &a)
             else
                 return false;
         }
+        else if (arg == "--threads" && i + 1 < argc)
+        {
+            a.threads = std::atoi(argv[++i]);
+            if (a.threads < 1)
+                return false;
+        }
         else if (!a.cfg && !arg.empty() && arg[0] != '-')
             a.cfg = argv[i];
         else
@@ -590,7 +597,7 @@ int main(int argc, char **argv)
     {
         fprintf(stderr,
                 "usage: %s data.csv [config.yaml] | data.csv --cma MASK "
-                "[--loss force|torque|both]\n",
+                "[--loss force|torque|both] [--threads N]\n",
                 argv[0]);
         return 1;
     }
@@ -599,7 +606,8 @@ int main(int argc, char **argv)
 
     // Fitness is parallelized across samples; keep each Quadcopter's per-prop
     // OpenMP loop serial so it doesn't oversubscribe inside that region.
-    omp_set_num_threads(NUM_THREADS);
+    if (args.threads > 0)
+        omp_set_num_threads(args.threads);
     omp_set_max_active_levels(1);
     std::vector<Quadcopter> fleet(omp_get_max_threads());
 

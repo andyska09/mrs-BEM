@@ -49,7 +49,7 @@ def main():
                    help="binary registry mask(s); one job each (default: 19 tunable params free)")
     p.add_argument("--loss", nargs="+", default=["both"], choices=["force", "torque", "both"])
     p.add_argument("--data", type=Path, default=DEFAULT_DATA)
-    p.add_argument("--ncpus", type=int, default=12, help="must match NUM_THREADS in CMAES.cpp")
+    p.add_argument("--ncpus", type=int, default=12, help="cores per job; job.sh passes nproc to cmaes --threads")
     p.add_argument("--mem", default="8gb")
     p.add_argument("--walltime", default="4:00:00")
     p.add_argument("--dry-run", action="store_true", dest="dry_run")

@@ -37,7 +37,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null
 make cmaes -j"$(nproc)"
 
 echo "--- running cmaes ---"
-./cmaes "$SCRATCHDIR/CMAES-dataset/data.csv" --cma "$MASK" --loss "$LOSS"
+./cmaes "$SCRATCHDIR/CMAES-dataset/data.csv" --cma "$MASK" --loss "$LOSS" --threads "$(nproc)"
 
 mkdir -p "$OUTDIR"
 cp -r "$SCRATCHDIR/CMAES-results/"* "$OUTDIR"/
