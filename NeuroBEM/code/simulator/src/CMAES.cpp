@@ -606,9 +606,16 @@ int main(int argc, char **argv)
 
     // Fitness is parallelized across samples; keep each Quadcopter's per-prop
     // OpenMP loop serial so it doesn't oversubscribe inside that region.
-    if (args.threads > 0)
-        omp_set_num_threads(args.threads);
+    // Default to the allocated cores (omp_get_num_procs respects the cpuset and
+    // ignores a PBS-injected OMP_NUM_THREADS=1). --threads overrides.
+    int nthreads = args.threads > 0 ? args.threads : omp_get_num_procs();
+    omp_set_num_threads(nthreads);
     omp_set_max_active_levels(1);
+    int used = 1;
+#pragma omp parallel
+#pragma omp single
+    used = omp_get_num_threads();
+    printf("openmp: %d threads\n", used);
     std::vector<Quadcopter> fleet(omp_get_max_threads());
 
     // Normalize each objective by its baseline (defaults) residual MSE
