@@ -1,10 +1,12 @@
 // CMA-ES BEM parameter fit on normalized force (+ optionally torque) MSE.
 //   ./cmaes data.csv                 report at compile-time defaults
 //   ./cmaes data.csv config.yaml     report at given config
-//   ./cmaes data.csv --cma MASK [--joint]  fit the registry params selected by
-//                                        the binary MASK (one bit per REGISTRY
-//                                        entry, e.g. 111 = cl,cd,k; trailing
-//                                        bits default to 0/fixed)
+//   ./cmaes data.csv --cma MASK [--loss force|torque|both]  fit the registry
+//                                        params selected by the binary MASK (one
+//                                        bit per REGISTRY entry, e.g. 111 =
+//                                        cl,cd,k; trailing bits default to
+//                                        0/fixed). --loss picks the objective
+//                                        (default force).
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -98,17 +100,23 @@ static void writeYaml(std::ostream &os, const std::map<std::string, double> &c)
     }
 }
 
+enum class Obj { Force, Torque, Both };
+static const char *objName(Obj o)
+{
+    return o == Obj::Force ? "force-only"
+           : o == Obj::Torque ? "torque-only" : "force+torque";
+}
+
 // Flat run record: line 1 = bitmask (one bit per REGISTRY entry), line 2 =
-// objective ("force+torque" or "force-only"), then the name of each optimized
-// (freed) param, one per line.
-static void writeCoeffTxt(std::ostream &os, const std::vector<int> &free,
-                          bool joint)
+// objective ("force-only" / "torque-only" / "force+torque"), then the name of
+// each optimized (freed) param, one per line.
+static void writeCoeffTxt(std::ostream &os, const std::vector<int> &free, Obj obj)
 {
     std::string mask(REGISTRY.size(), '0');
     for (int i : free)
         mask[i] = '1';
     os << mask << '\n';
-    os << (joint ? "force+torque" : "force-only") << '\n';
+    os << objName(obj) << '\n';
     for (int i : free)
         os << REGISTRY[i].key << '\n';
 }
@@ -205,12 +213,14 @@ static void mse(std::vector<Quadcopter> &fleet,
 static double loss(std::vector<Quadcopter> &fleet,
                    const std::vector<Sample> &data,
                    const std::map<std::string, double> &config, double sf,
-                   double st, bool joint)
+                   double st, Obj obj)
 {
     Array3d fm, tm;
     mse(fleet, config, data, fm, tm);
-    double l = fm.sum() / (sf * sf);
-    if (joint)
+    double l = 0;
+    if (obj != Obj::Torque)
+        l += fm.sum() / (sf * sf);
+    if (obj != Obj::Force)
         l += tm.sum() / (st * st);
     return l;
 }
@@ -449,10 +459,10 @@ static std::ofstream openLog(const std::string &rundir,
 static double objective(std::vector<Quadcopter> &fleet,
                         const std::vector<Sample> &data,
                         const SearchSpace &space, const VectorXd &x, double sf,
-                        double st, bool joint)
+                        double st, Obj obj)
 {
     double value = loss(fleet, data, space.toConfig(space.clamp(x)), sf, st,
-                        joint) +
+                        obj) +
                    PENALTY * space.penalty(x);
     return std::isfinite(value) ? value : 1e12;
 }
@@ -480,7 +490,7 @@ static void logGeneration(std::ofstream &log, int gen, double loss,
 
 static std::map<std::string, double> cma(std::vector<Quadcopter> &fleet,
                                          const std::vector<Sample> &data,
-                                         const std::vector<int> &idx, bool joint,
+                                         const std::vector<int> &idx, Obj obj,
                                          double sf, double st,
                                          const std::string &rundir)
 {
@@ -498,7 +508,7 @@ static std::map<std::string, double> cma(std::vector<Quadcopter> &fleet,
         std::vector<double> fitness(population.size());
         for (size_t k = 0; k < population.size(); ++k)
             fitness[k] = objective(fleet, data, space, population[k].point, sf,
-                                   st, joint);
+                                   st, obj);
 
         std::vector<int> ranked = rankByFitness(fitness);
         optimizer.update(population, ranked, gen);
@@ -525,7 +535,8 @@ struct Args
     const char *data = nullptr;
     const char *cfg = nullptr;
     std::vector<int> free;
-    bool do_cma = false, joint = false;
+    bool do_cma = false;
+    Obj obj = Obj::Force;
 };
 
 static bool parseArgs(int argc, char **argv, Args &a)
@@ -550,8 +561,18 @@ static bool parseArgs(int argc, char **argv, Args &a)
                     a.free.push_back((int)j);
             }
         }
-        else if (arg == "--joint")
-            a.joint = true;
+        else if (arg == "--loss" && i + 1 < argc)
+        {
+            std::string m = argv[++i];
+            if (m == "force")
+                a.obj = Obj::Force;
+            else if (m == "torque")
+                a.obj = Obj::Torque;
+            else if (m == "both")
+                a.obj = Obj::Both;
+            else
+                return false;
+        }
         else if (!a.cfg && !arg.empty() && arg[0] != '-')
             a.cfg = argv[i];
         else
@@ -569,7 +590,7 @@ int main(int argc, char **argv)
     {
         fprintf(stderr,
                 "usage: %s data.csv [config.yaml] | data.csv --cma MASK "
-                "[--joint]\n",
+                "[--loss force|torque|both]\n",
                 argv[0]);
         return 1;
     }
@@ -582,19 +603,16 @@ int main(int argc, char **argv)
     omp_set_max_active_levels(1);
     std::vector<Quadcopter> fleet(omp_get_max_threads());
 
-    double sf2 = 0, st2 = 0;
-    for (const Sample &s : data)
-    {
-        sf2 += s.fmeas.squaredNorm();
-        st2 += s.tmeas.squaredNorm();
-    }
-    double sf = std::sqrt(sf2 / data.size()), st = std::sqrt(st2 / data.size());
+    // Normalize each objective by its baseline (defaults) residual MSE
+    Array3d bfm, btm;
+    mse(fleet, defaults(), data, bfm, btm);
+    double sf = std::sqrt(bfm.sum()), st = std::sqrt(btm.sum());
 
     if (args.do_cma)
     {
-        printf("loaded %zu rows | sf=%.3f st=%.4f | %zu params free | %s\n",
+        printf("loaded %zu rows | nf=%.4f nt=%.5f | %zu params free | %s\n",
                data.size(), sf, st, args.free.size(),
-               args.joint ? "force+torque" : "force-only");
+               objName(args.obj));
         printf("free:");
         for (int i : args.free)
             printf(" %s", REGISTRY[i].key);
@@ -608,11 +626,11 @@ int main(int argc, char **argv)
                 .string();
         std::filesystem::create_directories(rundir);
         std::map<std::string, double> best =
-            cma(fleet, data, args.free, args.joint, sf, st, rundir);
+            cma(fleet, data, args.free, args.obj, sf, st, rundir);
         std::ofstream yaml(rundir + "/best.yaml");
         writeYaml(yaml, best);
         std::ofstream txt(rundir + "/coeff.txt");
-        writeCoeffTxt(txt, args.free, args.joint);
+        writeCoeffTxt(txt, args.free, args.obj);
         printf("--- best (written to %s) ---\n", rundir.c_str());
         std::array<double, 6> bestm = report(fleet, data, best);
         std::ofstream metrics(rundir + "/metrics.csv");
