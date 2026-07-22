@@ -22,9 +22,9 @@ echo "Mask: $MASK   Loss: $LOSS"
 echo "Started: $(date)"
 echo "============================="
 
-module add cmake gcc || true
-module add gsl || true
-module add eigen || true   # optional; CMakeLists auto-downloads Eigen if absent
+# eigen is required: the repo has no cmake/eigen.cmake download fallback, so
+# find_package(Eigen3) must succeed via the module.
+module add cmake gcc gsl eigen
 
 cp -r "$SIMDIR"/{include,src,CMakeLists.txt,cmake,bem_config.yaml} "$SCRATCHDIR"/ 2>/dev/null || \
   cp -r "$SIMDIR"/{include,src,CMakeLists.txt,cmake} "$SCRATCHDIR"/
