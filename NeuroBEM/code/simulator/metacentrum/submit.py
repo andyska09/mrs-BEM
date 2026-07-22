@@ -22,6 +22,7 @@ def submit(mask: str, loss: str, data: Path, args) -> None:
         f"OUTDIR={outdir}",
         f"MASK={mask}",
         f"LOSS={loss}",
+        f"NCPUS={args.ncpus}",
     ]
     cmd = [
         "qsub",

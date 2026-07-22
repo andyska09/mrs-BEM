@@ -33,13 +33,13 @@ cp "$DATA" "$SCRATCHDIR/CMAES-dataset/data.csv"
 cd "$SCRATCHDIR"
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null
-make cmaes -j"${PBS_NCPUS:-1}"
+make cmaes -j"$NCPUS"
 
-# PBS injects OMP_NUM_THREADS=1 (ompthreads=1), which also poisons `nproc`
-# (coreutils nproc honors OMP_NUM_THREADS). Use PBS_NCPUS = the real allocation.
-export OMP_NUM_THREADS="${PBS_NCPUS:-1}"
-echo "--- running cmaes on ${PBS_NCPUS:-1} cores ---"
-./cmaes "$SCRATCHDIR/CMAES-dataset/data.csv" --cma "$MASK" --loss "$LOSS" --threads "${PBS_NCPUS:-1}"
+# Core count is passed explicitly by submit.py (NCPUS); never use `nproc` here —
+# coreutils nproc honors the PBS-injected OMP_NUM_THREADS=1 and returns 1.
+export OMP_NUM_THREADS="$NCPUS"
+echo "--- running cmaes on $NCPUS cores ---"
+./cmaes "$SCRATCHDIR/CMAES-dataset/data.csv" --cma "$MASK" --loss "$LOSS" --threads "$NCPUS"
 
 mkdir -p "$OUTDIR"
 cp -r "$SCRATCHDIR/CMAES-results/"* "$OUTDIR"/
