@@ -35,7 +35,7 @@ python3 metacentrum/submit.py --mask 111 --loss force    # cl,cd,k force-only
 python3 metacentrum/submit.py --mask 111 11111111111111111111 --loss force both  # sweep (one job per pair)
 ```
 
-Defaults: 12 CPUs (matches hardcoded `NUM_THREADS`), 8 GB, 4 h walltime.
+Defaults: 12 CPUs (`job.sh` passes `nproc` to `cmaes --threads`), 8 GB, 4 h walltime.
 
 ## 4. Monitor
 

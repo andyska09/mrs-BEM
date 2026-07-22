@@ -14,7 +14,7 @@ Ground truth = `f=m·a`, `τ=I·α+ω×Iω` with mass 0.772, inertia [0.00254,0.
 | paper BEM+NN | 0.204 | 0.504 | 0.014 | 0.004 | 0.335 | 0.012 |
 
 
-² CMA-ES 6-param **force-only** fit (cl, cd, k, lift_offset, hforce_scale, pitch) on the 20k subset. Force −42% vs baseline out-of-sample; torque unchanged (not in the objective). cl 4.85 / pitch 27° / h-force ×2.65 are an entangled force-fitting compromise, not identified physics — rerun with `--joint` to constrain torque.
+² CMA-ES 6-param **force-only** fit (cl, cd, k, lift_offset, hforce_scale, pitch) on the 20k subset. Force −42% vs baseline out-of-sample; torque unchanged (not in the objective). cl 4.85 / pitch 27° / h-force ×2.65 are an entangled 
 
 ## Folders
 

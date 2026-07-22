@@ -3,6 +3,32 @@
 Every parameter of the C++ BEM, where it acts at runtime, and whether tuning it can do anything.
 Active config: `MODEL 1, CHORD 1, POLAR 1, DIST 0` ([params.h:7-33](../NeuroBEM/code/simulator/include/params.h#L7)).
 
+## REGISTRY name ↔ code variable
+
+| bit | REGISTRY key | code var | struct | note |
+|---|---|---|---|---|
+| 0 | `lift_coefficient` | `cl` | Propeller_s | polar lift coeff |
+| 1 | `drag_coefficient` | `cd` | Propeller_s | polar drag coeff |
+| 2 | `hinge_spring_constant` | `k` | Propeller_s | kβ hinge-spring stiffness |
+| 3 | `lift_offset` | `cl_offset` | Propeller_s | additive term in `cl·(sinαcosα + cl_offset)` |
+| 4 | `hforce_scale` | `hforce_scale` | Propeller_s | in-plane H-force scale |
+| 5 | `thrust_scale` | `thrust_scale` | Quadcopter_s | body-z rotor force scale |
+| 6 | `pitch` | `theta0` (θ0) | Propeller_s | blade pitch; YAML deg → `toRad` |
+| 7 | `twist` | `theta1` (θ1) | Propeller_s | blade twist; YAML deg → `toRad` |
+| 8 | `chord_inner` | `ci` | Propeller_s | chord at root |
+| 9 | `chord_outer` | `co` | Propeller_s | chord at tip |
+| 10 | `horizontal_drag_coefficient` | `cxy` | Quadcopter_s | fuselage drag, x&y |
+| 11 | `vertical_drag_coefficient` | `cz` | Quadcopter_s | fuselage drag, z |
+| 12 | `radius` | `R` | Propeller_s | prop radius (A=πR²) |
+| 13 | `dx` | `dx` | Quadcopter_s | prop x offset |
+| 14 | `dy` | `dy` | Quadcopter_s | prop y offset |
+| 15 | `dz` | `dz` | Quadcopter_s | prop z offset |
+| 16 | `frontarea_x` | `Ax` | Quadcopter_s | fuselage area x |
+| 17 | `frontarea_y` | `Ay` | Quadcopter_s | fuselage area y |
+| 18 | `frontarea_z` | `Az` | Quadcopter_s | fuselage area z |
+| 19 | `num_blades` | `b` | Propeller_s | load-only tail (kept at default) |
+| 20 | `air_density` | `rho` (ρ) | both | load-only tail (kept at default) |
+
 ## How parameters flow
 
 - Only `cl, cd, k` are instance members, runtime-settable via the `setAero` chain
