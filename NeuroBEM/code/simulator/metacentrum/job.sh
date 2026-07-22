@@ -35,7 +35,9 @@ mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null
 make cmaes -j"$(nproc)"
 
-echo "--- running cmaes ---"
+# PBS injects OMP_NUM_THREADS=1 (ompthreads=1); override to the allocated cores.
+export OMP_NUM_THREADS="$(nproc)"
+echo "--- running cmaes on $(nproc) cores ---"
 ./cmaes "$SCRATCHDIR/CMAES-dataset/data.csv" --cma "$MASK" --loss "$LOSS" --threads "$(nproc)"
 
 mkdir -p "$OUTDIR"
