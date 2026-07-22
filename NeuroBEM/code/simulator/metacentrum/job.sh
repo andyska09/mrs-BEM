@@ -35,11 +35,12 @@ mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null
 make cmaes -j"$NCPUS"
 
-# Core count is passed explicitly by submit.py (NCPUS); never use `nproc` here —
-# coreutils nproc honors the PBS-injected OMP_NUM_THREADS=1 and returns 1.
+# Do NOT pass --threads: the binary defaults to omp_get_num_procs() = the cpuset's
+# allocated cores, which overrides the PBS-injected OMP_NUM_THREADS=1. Passing a
+# core count here is how every stale-file/nproc bug crept in. Belt: export it too.
 export OMP_NUM_THREADS="$NCPUS"
-echo "--- running cmaes on $NCPUS cores ---"
-./cmaes "$SCRATCHDIR/CMAES-dataset/data.csv" --cma "$MASK" --loss "$LOSS" --threads "$NCPUS"
+echo "--- running cmaes ($NCPUS cores allocated) ---"
+./cmaes "$SCRATCHDIR/CMAES-dataset/data.csv" --cma "$MASK" --loss "$LOSS"
 
 mkdir -p "$OUTDIR"
 cp -r "$SCRATCHDIR/CMAES-results/"* "$OUTDIR"/

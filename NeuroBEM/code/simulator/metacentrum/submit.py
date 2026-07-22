@@ -27,7 +27,7 @@ def submit(mask: str, loss: str, data: Path, args) -> None:
     cmd = [
         "qsub",
         "-N", f"cmaes_{loss}_{mask.count('1')}p",
-        "-l", f"select=1:ncpus={args.ncpus}:mem={args.mem}:scratch_local=4gb",
+        "-l", f"select=1:ncpus={args.ncpus}:ompthreads={args.ncpus}:mem={args.mem}:scratch_local=4gb",
         "-l", f"walltime={args.walltime}",
         "-j", "oe",
         "-o", "logs/",
