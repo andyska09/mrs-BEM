@@ -138,7 +138,7 @@ python3 metacentrum/submit.py --dry-run                       # preview qsub, su
 python3 metacentrum/submit.py                                 # full 19-param free, loss=both, 12 CPUs
 python3 metacentrum/submit.py --mask 111 --loss force         # cl,cd,k force-only
 ```
-`submit.py` requests `ncpus=ompthreads=N` and passes `NCPUS` into the job (used for `make -j`); `job.sh` does **not** pass `--threads`, so `cmaes` uses all allocated cores via `omp_get_num_procs()`. `job.sh` copies each `CMAES-results/<ts>/` back to `$OUTDIR`. Clone the repo on the cluster (SSH deploy key) and rsync the gitignored `subset_20k.csv` over first (see `metacentrum.md`).
+`submit.py` requests `ncpus=ompthreads=N` and passes `NCPUS` into the job (used for `make -j`); `job.sh` does **not** pass `--threads`, so `cmaes` uses all allocated cores via `omp_get_num_procs()`. `job.sh` copies each `CMAES-results/<ts>/` back to `$OUTDIR`. The full repo clone (`mrs-BEM`) **and the gitignored `subset_20k.csv` are already on MetaCentrum** — no uploads needed, just submit (see `metacentrum.md`, the single authoritative walkthrough now that the duplicate loose copy is gone).
 
 ### Apply the base model to flight data
 ```
