@@ -35,7 +35,8 @@ python3 metacentrum/submit.py --mask 111 --loss force    # cl,cd,k force-only
 python3 metacentrum/submit.py --mask 111 11111111111111111111 --loss force both  # sweep (one job per pair)
 ```
 
-Defaults: 12 CPUs (`job.sh` passes `nproc` to `cmaes --threads`), 8 GB, 4 h walltime.
+Defaults: 12 CPUs, 8 GB, 4 h walltime. `cmaes` runs one OpenMP thread per
+allocated core (it does **not** take `--threads`; see the note in `job.sh`).
 
 ## 4. Monitor
 
@@ -56,7 +57,7 @@ rsync -av --ignore-existing YOUR_USERNAME@perian.metacentrum.cz:~/cmaes/CMAES-re
 ## Notes
 
 - `--cma MASK`: binary, one bit per REGISTRY entry (19 tunable + 2 fixed tail). 19 ones = all tunable free.
-- `--loss force|torque|both` replaces the old `--joint` flag (`both` == joint).
+- `--loss force|torque|both` selects which residual terms enter the objective.
 - Build needs modules `cmake gcc gsl eigen` (job.sh loads them). Eigen is
   **required** — the repo has no cmake/eigen.cmake fallback, so find_package(Eigen3)
   must resolve via the module. If a name fails, locate it with `module avail eigen`.

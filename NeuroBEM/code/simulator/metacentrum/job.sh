@@ -8,6 +8,7 @@
 #   MASK    - binary registry mask (e.g. 19 ones = all tunable params free)
 #   LOSS    - force | torque | both
 
+# submit.py always overrides -l on the qsub command line; these are fallback only.
 #PBS -N cmaes
 #PBS -l select=1:ncpus=12:mem=8gb:scratch_local=4gb
 #PBS -l walltime=4:00:00
@@ -35,11 +36,8 @@ mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release >/dev/null
 make cmaes -j"$NCPUS"
 
-# Do NOT pass --threads: the binary defaults to omp_get_num_procs() = the cpuset's
-# allocated cores, which overrides the PBS-injected OMP_NUM_THREADS=1. Passing a
-# core count here is how every stale-file/nproc bug crept in. Belt: export it too.
-export OMP_NUM_THREADS="$NCPUS"
-echo "--- running cmaes ($NCPUS cores allocated) ---"
+# No --threads: cmaes uses all allocated cores automatically (omp_get_num_procs).
+echo "--- running cmaes on $NCPUS cores ---"
 ./cmaes "$SCRATCHDIR/CMAES-dataset/data.csv" --cma "$MASK" --loss "$LOSS"
 
 mkdir -p "$OUTDIR"
