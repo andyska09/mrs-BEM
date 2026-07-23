@@ -3,35 +3,12 @@
 Metrics (paper Table II): `Fxy=√((Fx²+Fy²)/2)`, `Fz` per-axis; `F=√((Fx²+Fy²+Fz²)/3)`; same for torque M.
 Ground truth = `f=m·a`, `τ=I·α+ω×Iω` with mass 0.772, inertia [0.00254,0.00214,0.00436].
 
-## Results (test set, Table II format)
 
-| config | Fxy | Fz | Mxy | Mz | F | M |
-|---|---|---|---|---|---|---|
-| `bem` (baseline) | 0.575 | 1.663 | 0.127 | 0.015 | 1.069 | 0.104 |
-| `2026-07-15-00-00-00` | 0.577 | 1.612 | 0.124 | 0.015 | 1.043 | 0.102 |
-| `2026-07-21-14-54-19`² | 0.397 | 0.907 | 0.129 | 0.014 | 0.616 | 0.106 |
-| `2026-07-22-15-14-56`³ | 0.551 | 1.625 | 0.027 | 0.016 | 1.040 | 0.024 |
-| **paper BEM** | 0.803 | 1.265 | 0.090 | 0.017 | 0.982 | 0.074 |
-| paper BEM+NN | 0.204 | 0.504 | 0.014 | 0.004 | 0.335 | 0.012 |
-
-
-² CMA-ES 6-param **force-only** fit (cl, cd, k, lift_offset, hforce_scale, pitch) on the 20k subset. Force −42% vs baseline out-of-sample; torque unchanged (not in the objective). cl 4.85 / pitch 27° / h-force ×2.65 are an entangled
-
-³ CMA-ES 6-param **joint** fit (cl, cd, k, dx, dy, dz) with the balanced force+torque loss (each objective normalized by its baseline MSE so torque no longer drowns force, [CMAES.cpp:606](../NeuroBEM/code/simulator/src/CMAES.cpp#L606)) on the 20k subset. Out-of-sample: **torque M −77% (Mxy 4.8×)** and **force F −3%** — both generalize (only Mz +8%). cl=14.57/cd=16.91 stay physical; the moment arms dx/dy/dz all rail to their lower bounds (`dz` sign-flips) — an *effective* torque correction, not true geometry, but it holds on held-out flights. Torque is the real, param-fixable win; the residual Fz≈1.6 is NN territory.
-
-## Folders
+## Old folders
 
 | folder | files | cols | cl | cd | k | extra | purpose |
 |---|---|---|---|---|---|---|---|
 | `bem` | full | 35 | 15.242 | 13.549 | 5.89 | — | canonical baseline, default identified params (params.h) |
-| `2026-07-15-00-00-00` | full | 35 | 14.329 | 14.454 | 5.89 | — | CMA-ES force-only fit (cl, cd); files prefixed `bem-01_` |
-| `2026-07-21-14-54-19` | test | 35 | 4.846 | 3.086 | 1.729 | +0.046 offset, ×2.65 h-force, pitch 27.0° | CMA-ES 6-param force-only fit (subset_20k); matches `CMAES-results/2026-07-21-14-54-19` |
-| `2026-07-22-15-14-56` | test | 35 | 14.567 | 16.912 | 2.350 | dx=0.040, dy=0.050, dz=−0.050 (arms railed) | CMA-ES 6-param **joint** fit (cl,cd,k,arms), balanced loss; torque 4.4× on test; matches `CMAES-results/2026-07-22-15-14-56` |
-
-### Old runs
-
-| folder | files | cols | cl | cd | k | extra | purpose |
-|---|---|---|---|---|---|---|---|
 | `bem-007` | test | 35 | 15.242 | 13.549 | 5.89 | +0.07 lift offset | failed: +0.07 on the large default cl over-thrusts |
 | `bem-vi-baseline` | full | 47 | 15.242 | 13.549 | 5.89 | +12 per-motor vi/mu/as diag | same as `bem`; source for CMA-ES subset binning |
 | `bem-agi` | test | 35 | 4.797 | 4.169 | 5.89 | +0.07 offset, ×3 h-force | agilicious recipe; thrust_scale (~1.30 on Fz) NOT baked |
@@ -52,10 +29,8 @@ All are constant linear scales or a fixed offset.
 
 Notes:
 - #2/#3 are hardcoded constants; #4 is a YAML-tunable member (value not in repo, back-fit ≈1.30); #1 are identified params.
-- The set is **coupled** — porting #2 alone onto the repo's large cl blows up (`bem-007`, Fz 7.0). #1+#2+#3+#4 together recover the paper (Fz≈1.0, F≈0.71).
 
 ## Key findings
-- **CMA-ES splits cleanly by objective**: freeing torque params (cd, k, dx, dy, dz) with a balanced loss cuts torque **M 4.4×** out-of-sample (`2026-07-22-15-14-56`), but force params (cl) only shave ~3% off F. → **torque is param-fixable, the Fz force residual is NN territory** (matches the paper's split). The torque gain rides on the moment arms railing to bounds (effective, not physical) — cd/k alone do nothing.
 - Baseline `bem` **Fxy (0.575) already beats the paper (0.803)**; the whole gap is Fz.
 - Fz error is a **forward-flight** effect: 0.33 N at hover → 4.06 N at 14–18 m/s.
 - Corrections are **not independently portable**: `+0.07` on the default large cl blows up
