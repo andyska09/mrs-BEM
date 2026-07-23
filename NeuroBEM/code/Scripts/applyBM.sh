@@ -5,8 +5,8 @@
 # file that supplies a list of names to be converted
 
 programPath="../simulator/build/bem-model"
-model="2026-07-22-12-36-31"
-config="../../CMAES-results/2026-07-22-12-36-31/best.yaml"
+model="2026-07-22-18-39-25"
+config="../../CMAES-results/2026-07-22-18-39-25/best.yaml"
 
 if [ "$1" != "" ]
 then
