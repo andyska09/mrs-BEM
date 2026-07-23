@@ -1,12 +1,10 @@
+import sys
 from pathlib import Path
 
 import numpy as np
 
 MASS = 0.772                                    # Readme.md
 INERTIA = np.array([0.0025, 0.0021, 0.0043])    # Readme.md
-
-SRC = Path("processed_data/bem")
-DST = Path("processed_data/bem")
 
 
 def residuals(d):
@@ -15,9 +13,9 @@ def residuals(d):
     return f - d[:, 29:32], t - d[:, 32:35]
 
 
-DST.mkdir(parents=True, exist_ok=True)
-for f in sorted(SRC.glob("bem_*.csv")):
+folder = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("processed_data/bem")
+for f in sorted(folder.glob("*.csv")):
     d = np.loadtxt(f, delimiter=",")
     rf, rt = residuals(d)
-    np.savetxt(DST / f.name, np.hstack([d[:, :35], rf, rt]), delimiter=",", fmt="%.6f")
+    np.savetxt(f, np.hstack([d[:, :35], rf, rt]), delimiter=",", fmt="%.6f")
     print(f.name)
