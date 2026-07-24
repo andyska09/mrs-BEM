@@ -14,20 +14,7 @@ from utils.normalization import Normalization
 from utils.visualization import create_plot_dict
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Perform ablation study on all runs in a folder.')
-    parser.add_argument('--load_folder', help='Folder to restore network from', required=True)
-    parser.add_argument('--data_root', help='Folder/File to load data', required=True)
-    parser.add_argument('--output_dir', help='Folder to save plots (png & csv)', required=True)
-
-    args = parser.parse_args()
-    load_folder_path = args.load_folder
-    root_dir = args.data_root
-    output_dir = args.output_dir
-
-    assert os.path.isdir(output_dir)
-    assert os.path.isdir(load_folder_path)
-
+def run_inference(load_folder_path, root_dir):
     settings_path = os.path.join(load_folder_path, 'settings.yaml')
     settings = Settings(settings_path, generate_log=False)
 
@@ -63,10 +50,27 @@ def main():
         labels_list.append(np.squeeze(labels.numpy()))
         infos_list.append(np.squeeze(infos.numpy()))
 
-    # plot the result
-    network_predictions_np = np.vstack(network_predictions_list)
-    labels_np = np.vstack(labels_list)
-    infos_np = np.vstack(infos_list)
+    return np.vstack(network_predictions_list), np.vstack(labels_list), np.vstack(infos_list)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Perform ablation study on all runs in a folder.')
+    parser.add_argument('--load_folder', help='Folder to restore network from', required=True)
+    parser.add_argument('--data_root', help='Folder/File to load data', required=True)
+    parser.add_argument('--output_dir', help='Folder to save plots (png & csv)', required=True)
+
+    args = parser.parse_args()
+    load_folder_path = args.load_folder
+    root_dir = args.data_root
+    output_dir = args.output_dir
+
+    assert os.path.isdir(output_dir)
+    assert os.path.isdir(load_folder_path)
+
+    network_predictions_np, labels_np, infos_np = run_inference(load_folder_path, root_dir)
+
+    plot_dict = create_plot_dict(network_predictions_np, labels_np, infos_np,
+                                 plot_cumulative=True)
 
     plot_dict = create_plot_dict(network_predictions_np, labels_np, infos_np,
                                  plot_cumulative=True)
