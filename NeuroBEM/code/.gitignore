@@ -1,5 +1,6 @@
 #### Dataset
 Matlab/tmp/
+Python/data/2026-*/
 Python/train_logs/
 *.trt
 
