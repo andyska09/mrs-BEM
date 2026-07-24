@@ -39,19 +39,19 @@ main() {
   echo "=========================="
   for file in $trainfiles
   do
-    cp "$1""/""$dataset""/""$file" $dataset/train/
+    ln -f "$1""/""$dataset""/""$file" $dataset/train/
     echo $dataset/train/$file
   done
 
   for file in $valfiles
   do
-    cp "$1""/""$dataset""/""$file" $dataset/validation/
+    ln -f "$1""/""$dataset""/""$file" $dataset/validation/
     echo $dataset/validation/$file
   done
   
   for file in $testfiles
   do
-    cp "$1""/""$dataset""/""$file" $dataset/test/
+    ln -f "$1""/""$dataset""/""$file" $dataset/test/
     echo $dataset/test/$file
   done
   
