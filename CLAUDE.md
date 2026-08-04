@@ -47,7 +47,7 @@ This repo is a workspace of four loosely-coupled parts:
 
 ### Root-level dataset docs (under `NeuroBEM/`)
 
-- [NeuroBEM/README.md](NeuroBEM/README.md) — dataset-level README: folder layout and exact CSV column orders (29 cols for processed data; +12 cols 30–41 for `predictions/` = predicted force/torque + residuals). Drone mass 0.772 kg, diagonal inertia [0.0025, 0.0021, 0.0043]. Its `predictions/` folder is the dataset name for the stage-2 output the pipeline docs call `MODEL/`/`bem+nn/`.
+- [NeuroBEM/README.md](NeuroBEM/README.md) — dataset-level README: folder layout and exact CSV column orders (29 cols for processed data; +12 cols 30–41 for `predictions/` = predicted force/torque + residuals). Drone mass 0.772 kg, diagonal inertia [0.0025, 0.0021, 0.0043]. Its `predictions/` folder is the dataset name for the stage-2 output the pipeline docs call `MODEL/`. **`NeuroBEM/bem+nn/` is that folder as downloaded** — the paper authors' own BEM+NN predictions (41 cols), a reference to compare against, *not* something this repo regenerates.
 - [NeuroBEM/Flights.txt](NeuroBEM/Flights.txt) — catalog of all 95 flights as MATLAB `dataset = "<timestamp>"` lines, each commented with its trajectory type.
 - [NeuroBEM/testset.txt](NeuroBEM/testset.txt) — 13 held-out `<ID>_seg_X` segments (dataset-level hold-out). The pipeline's own `testset.txt` consumed by `get_datafiles.bash` lives under [NeuroBEM/code/Python/data/](NeuroBEM/code/Python/data/).
 
@@ -107,8 +107,24 @@ A separate Python workspace (formerly `EDA/`) for data-quality analysis and BEM-
 - [NeuroBEM/analysis/measure_bem_RMSE.py](NeuroBEM/analysis/measure_bem_RMSE.py) — BEM baseline residual RMSE (measured − predicted) over the full set and the `testset.txt` hold-out. Run: `python3 analysis/measure_bem_RMSE.py` (defaults to `processed_data/bem` + root `testset.txt`; self-contained, hard-codes the simulator `mass = 0.752` / inertia).
 - [NeuroBEM/make_nn_targets.py](NeuroBEM/make_nn_targets.py) — post-processes a `processed_data/bem-*` folder into NN residual targets: reads 35-col `bem_*.csv`, computes `residuals()` (force `= MASS·acc`, torque `= INERTIA·α + ω×INERTIA·ω` with `MASS = 0.772`, `INERTIA = [0.0025,0.0021,0.0043]` from `README.md`), writes `[first 35 cols, 6 residuals]`.
 - **Re-identification / CMA-ES workflow (advisor ask; lives in the `cmaes` C++ tool).** The active re-identifier is `code/simulator/src/CMAES.cpp` → the **`cmaes`** executable (a second CMake target alongside `bem-model`). It reads one flat data CSV (the same 29+ col merged/bem layout, `load()` reads cols 1–23), builds a **fleet of `Quadcopter`s (one per OpenMP thread)** and parallelizes the fitness **across samples** ([CMAES.cpp:185](NeuroBEM/code/simulator/src/CMAES.cpp#L185); thread count defaults to `omp_get_num_procs()` (the allocated cores), overridable with `--threads N`; prints `openmp: N threads`), and via `Quadcopter::load` sweeps a **21-entry `REGISTRY`** ([CMAES.cpp:54](NeuroBEM/code/simulator/src/CMAES.cpp#L54)) of tunable params, each `{key, section, default, lo, hi}` (`section` = `bem`/`quad`/`body_drag`, used to group the emitted YAML), **ordered by optimization priority** — `lift_coefficient, drag_coefficient, hinge_spring_constant, lift_offset, hforce_scale, thrust_scale, pitch, twist, chord_inner, chord_outer, horizontal_drag_coefficient, vertical_drag_coefficient, radius, dx, dy, dz, frontarea_x/y/z`, then a **load-only tail** `num_blades, air_density` (kept at default). `--cma MASK` frees the entries whose bit is `1` in the binary `MASK` (one bit per REGISTRY entry, left-aligned; e.g. `111` = `cl,cd,k`, trailing/unset bits stay fixed at default). The objective is **residual MSE normalized by the baseline (defaults) residual MSE** — `fm.sum()/sf² + tm.sum()/st²` with `sf,st` = sqrt of the defaults' force/torque MSE ([CMAES.cpp:606](NeuroBEM/code/simulator/src/CMAES.cpp#L606)) — and **`--loss force|torque|both`** selects which terms are included (default `force`; replaces the old `--joint` flag; 100 gens, `MAXGEN` constant). Config is **YAML in and out**: `./cmaes data.csv` (report at defaults), `./cmaes data.csv config.yaml` (report at values loaded via `loadConfig` from [config.h](NeuroBEM/code/simulator/include/config.h)), `./cmaes data.csv --cma MASK [--loss force|torque|both]` (run the fit; prints baseline → CMA-ES → best, writes a per-run folder `CMAES-results/<ts>/` containing `best.yaml` (sectioned by `bem`/`quad`/`body_drag`), `convergence.csv` (trace), `coeff.txt` (mask line + objective line `force-only`/`torque-only`/`force+torque` + one freed-param name per line), and `metrics.csv` (**best** config's reported RMSE only: header `Fxy,Fz,F,Mxy,Mz,M` + one row)). The flat CSV `cmaes` consumes is built by [NeuroBEM/CMAES-dataset/make_subset.py](NeuroBEM/CMAES-dataset/make_subset.py) → `CMAES-dataset/subset_20k.csv`: pools all non-test flights from `processed_data/bem-vi-baseline/` (47-col), bins rows on a 6×6 quantile grid of per-row mean `(mu, vi)` (`utils.diagnostics`), and randomly samples ~equally per cell (`SEED=0`, `N_TARGET=20000`). The `processed_data/` timestamped subfolders (`2026-07-15-…` … `2026-07-23-…`, each matching a `CMAES-results/<ts>/best.yaml`) plus `bem` / `bem-vi-baseline` / `bem-007` / `bem-agi` are outputs of different tunes (see [notes/agi_notes.md](notes/agi_notes.md) for the exact cl/cd/k and corrections each uses).
-- Notebooks: [NeuroBEM/analysis/feature_analyis.ipynb](NeuroBEM/analysis/feature_analyis.ipynb), [NeuroBEM/analysis/pred_analysis.ipynb](NeuroBEM/analysis/pred_analysis.ipynb), [NeuroBEM/analysis/vi_analysis.ipynb](NeuroBEM/analysis/vi_analysis.ipynb).
-- **[NeuroBEM/CMAES-results-analysis/](NeuroBEM/CMAES-results-analysis/)** — cross-run comparison of every `CMAES-results/<ts>/` fit. `results_analysis.ipynb` loads each run's `best.yaml`/`coeff.txt`/`metrics.csv`, builds a coefficient table (freed params highlighted, defaults from `processed_data/bem/params.yaml`), a metrics table vs the **paper Table II** BEM baseline, and convergence-trace plots. `agi_coeffs.yaml` is the agilicious-specific coefficient set included as an extra column for comparison.
+- Notebooks: [NeuroBEM/analysis/feature_analyis.ipynb](NeuroBEM/analysis/feature_analyis.ipynb) (writes `noise_corpus.csv`), [NeuroBEM/analysis/pred_analysis.ipynb](NeuroBEM/analysis/pred_analysis.ipynb) (writes `pred_rmse.csv` / `pred_snr.csv` — per-flight BEM RMSE and SNR, committed so they can be diffed across tunes), [NeuroBEM/analysis/vi_analysis.ipynb](NeuroBEM/analysis/vi_analysis.ipynb).
+- **[NeuroBEM/CMAES-results-analysis/](NeuroBEM/CMAES-results-analysis/)** — the reporting layer; three notebooks, all producing tables in **paper Table II** format (`Fxy, Fz, Mxy, Mz, F, M` + `impr%` columns) with the paper's numbers hardcoded for comparison.
+  - `results_analysis.ipynb` — cross-run comparison of every `CMAES-results/<ts>/` fit: coefficient table (freed params highlighted, defaults from `processed_data/bem/params.yaml`), metrics table, convergence traces. `agi_coeffs.yaml` is the agilicious coefficient set, included as an extra column.
+  - `table_testset_rmse.ipynb` — **BEM only, no NN**: recomputes hold-out RMSE per `processed_data/` tune folder with the `measure_bem_RMSE` stack, plus best/worst-segment measured-vs-modeled plots.
+  - `table2.ipynb` — **BEM vs BEM+NN**: the actual paper-Table-II reproduction. Its `MODELS` dict maps each label to a `(train_logs/<ts2>, data/<ts>/test)` pair — add a row here after each training run. Note the import dance at the top: `analysis/utils.py` shadows the `code/Python/utils` namespace package, so the notebook strips `analysis/` from `sys.path`, evicts the cached `utils` module, `chdir`s into `code/Python`, and loads `measure_bem_RMSE` by file path.
+
+## The main loop: tune → BEM predictions → NN targets → split → train → tables
+
+Everything below is keyed on one **run timestamp** `<ts>` (e.g. `2026-07-23-15-54-29`), which is simultaneously the `CMAES-results/<ts>/` folder, the `processed_data/<ts>/` prediction folder, the `data/<ts>/` split folder, and the file prefix `<ts>_<flight>_seg_X.csv`. Keep them identical — every step globs on it. The NN `train_logs/<ts2>` timestamp is a *different*, TF-generated one; the mapping run↔model lives only in the `MODELS` dict of `table2.ipynb`.
+
+1. **CMA-ES fit** (`cmaes`, optionally on MetaCentrum) → `CMAES-results/<ts>/{best.yaml,coeff.txt,metrics.csv,convergence.csv}`.
+2. **BEM predictions**: `applyBM.sh processed_data/ <ts> CMAES-results/<ts>/best.yaml` → `processed_data/<ts>/<ts>_*_seg_*.csv`, 35 cols + `params.yaml`.
+3. **NN targets**: `make_nn_targets.py processed_data/<ts>` → same files, 41 cols (residuals appended in place; re-running is idempotent since it re-slices `d[:, :35]`).
+4. **Split**: `mkdir -p code/Python/data/<ts>/{train,validation,test}`, then `get_datafiles.bash ../../../processed_data <ts>` (hard links; `data/testset.txt` pins the 13-segment hold-out).
+5. **Train**: set `base_type: "<ts>"` in `config/bem_settings.yaml`, run `train.py` → `train_logs/<ts2>/` with `best_model/`, `settings.yaml`, `all.yaml` (normalization constants).
+6. **Evaluate**: `generate_ablation_study.py` for per-signal plots/CSVs into `eval_out/<ts>_{train,test}`, and the notebooks for the tables (below).
+
+The evaluation notebooks all reuse `generate_ablation_study.run_inference(load_folder, data_root)`, which returns `(preds, labels, infos)` where `labels` = the BEM residual (→ the **BEM** row) and `labels - preds` = the residual left after the NN (→ the **BEM+NN** row); `infos[:, 2:8]` is the base-model force/torque, so `labels + infos[:, 2:8]` reconstructs the measurement. `data_root` may be a folder **or a single CSV** — that is how per-segment plots are made.
 
 ## Common commands
 
@@ -145,15 +161,27 @@ python3 metacentrum/submit.py --mask 111 --loss force         # cl,cd,k force-on
 ### Apply the base model to flight data
 ```
 cd NeuroBEM/code/Scripts
-./applyBM.sh ../ExampleData/OptiTrack/        # or pass a filelist as 2nd arg
+./applyBM.sh ../../processed_data/ 2026-07-23-15-54-29 ../../CMAES-results/2026-07-23-15-54-29/best.yaml
 ```
+Signature is `./applyBM.sh BASEPATH MODEL CONFIG [filelist]` ([applyBM.sh:3](NeuroBEM/code/Scripts/applyBM.sh#L3)): `MODEL` is the **output subfolder name** (convention: the CMA-ES run timestamp), `CONFIG` the params YAML. Writes `BASEPATH/MODEL/MODEL_<flight>_seg_X.csv` (35 cols) for every `BASEPATH/merged_*seg*.csv`, plus `params.yaml`. Optional 4th arg is a file listing flight IDs instead of globbing.
+
+### Turn BEM predictions into NN targets
+```
+cd NeuroBEM && conda run -n neurobem python make_nn_targets.py processed_data/2026-07-23-15-54-29
+```
+In-place 35 → 41 cols (appends the 6 residuals). Must run before the split — the loader expects the residual columns.
 
 ### Prepare the NN dataset (train/val/test split)
+**This runs fine on this Mac** — the brew GNU tools are already installed, they just need to be first on `PATH`:
 ```
-cd NeuroBEM/code/Python/data
-./get_datafiles.bash ../../ExampleData/OptiTrack/ bem
+export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:/opt/homebrew/opt/findutils/libexec/gnubin:$PATH"
 ```
-Splits are copied into `data/bem/{train,validation,test}`. `testset.txt` defines a manual hold-out set.
+```
+cd NeuroBEM/code/Python/data && ./get_datafiles.bash ../../../processed_data 2026-07-23-15-54-29
+```
+The script is GNU-only (`sort --random-source -R`, `head/tail --lines=-N`, bare `find -type f`, `mv -t`); BSD versions fail. Never claim it can't run on macOS — export the PATH above and run it.
+
+`./get_datafiles.bash DATAPATH DATASET`, where `DATASET` is the subfolder under `DATAPATH` **and** the local split folder name — `data/DATASET/{train,validation,test}` must already exist (the script only wipes + refills them). Files are **hard-linked**, not copied ([get_datafiles.bash:47](NeuroBEM/code/Python/data/get_datafiles.bash#L47)). Split: seeded (`seed=42`) random shuffle, 49 validation + 1 test segment, rest train; then, if `data/testset.txt` exists, the whole test folder is moved back to train and only the 13 IDs listed there become the test set ([get_datafiles.bash:59](NeuroBEM/code/Python/data/get_datafiles.bash#L59)). `data/2026-*/` is gitignored.
 
 ### Train / monitor / test the network
 ```
@@ -161,9 +189,10 @@ cd NeuroBEM/code/Python
 conda run -n neurobem python train.py --settings_file config/bem_settings.yaml
 tensorboard --logdir=train_logs            # checkpoints + best_model under train_logs/TIMESTAMP/
 conda run -n neurobem python predict_from_pb.py --log_folder train_logs/TIMESTAMP/    # sanity-check (ones input)
-conda run -n neurobem python generate_ablation_study.py --load_folder train_logs/TIMESTAMP --data_root data/bem/test --output_dir eval_out    # per-axis RMSE vs paper + plots
+conda run -n neurobem python generate_ablation_study.py --load_folder train_logs/TIMESTAMP --data_root data/DATASET/test --output_dir eval_out/DATASET_test    # per-axis RMSE vs paper + plots
 conda run -n neurobem python verify_onnx.py --log_folder train_logs/TIMESTAMP/        # ONNX == TF on ones-input
 ```
+`train.py` reads `base_type` from the settings YAML to pick `data/<base_type>/{train,validation,test}` — for a CMA-ES tune set it to the timestamp (`base_type: "2026-07-23-15-54-29"`), not `"bem"`. `--output_dir` must exist; convention is `eval_out/<DATASET>_test` / `_train`.
 
 ### BEM baseline RMSE
 ```
@@ -175,10 +204,11 @@ No CLI build/test harness — scripts are run inside MATLAB. Every function is d
 
 ## Conventions & gotchas
 
+- **NO TEMP DIRECTORIES, NO SCRATCH FILES.** Never write to `/tmp`, `/private/tmp/claude-*`, or any scratchpad. Everything must be reproducible: either put the script in the repo where it belongs, or don't write it at all and just describe what you would run.
 - **MINIMAL COMMENTS AND DOCSTRINGS.** Keep comments and docstrings to an absolute minimum — code should be self-explanatory. Keep the code itself as simple as possible.
 - **ALWAYS CHECK THE SOURCE, ALWAYS CITE IT.** Never answer factual questions about the code/data (what a value is, where a signal comes from, how something is computed) from memory, the summary, or inference — open the actual file and verify. Every claim must come with a source the user can open: `file:line` (e.g. [MergeAndPreprocessData.m:277](NeuroBEM/code/Matlab/OptiTrack/MergeAndPreprocessData.m#L277)), not a vague reference. Trace data provenance to the exact line that assigns/derives it.
 - **Flight-file naming is load-bearing.** All artifacts for one flight share a base ID (typically a timestamp like `2021-02-03-13-43-38`) with different prefixes/suffixes/extensions: `merged_<ID>_seg_X.csv`, `bem_<ID>_seg_X.csv`, `<ID>_traj.csv`, `<ID>.BFL`, etc. Scripts glob on these patterns, so renames break the pipeline.
 - BEM coning/flapping angles use the *linear* lift/drag coefficients (`param.a`/`param.d`); changing the *nonlinear* `param.cl`/`param.cd` will not move those angles. This is intentional (tractability).
 - `Coning.m` is described in the README as fragile/"a hack" (FFT of audio to recover prop RPM) — handle with care.
 - **Multiple mass/inertia values are in play — cite the right one.** The C++ simulator and `analysis/measure_bem_RMSE.py` use `mass = 0.752`, `I = [0.00254, 0.00214, 0.00436]` ([params.h:115-118](NeuroBEM/code/simulator/include/params.h#L115)). The dataset `README.md` (and `make_nn_targets.py`, and the paper) use `0.772`, `[0.0025, 0.0021, 0.0043]`. Check which a given script uses before computing forces/torques from `processed_data/bem/`.
-- Gitignored outputs you should not commit: `Python/train_logs/`, `simulator/build/`, `Matlab/tmp/`, `*.trt`, `*.asv`, `NeuroBEM/processed_data/`, `NeuroBEM/raw_data/`.
+- Gitignored outputs you should not commit: `Python/train_logs/`, `Python/data/2026-*/`, `Python/eval_out/`, `simulator/build/`, `Matlab/tmp/`, `*.trt`, `*.asv`, `NeuroBEM/processed_data/`, `NeuroBEM/raw_data/`, `NeuroBEM/bem+nn/`. The notebooks under `CMAES-results-analysis/` and `analysis/` **are** committed with their outputs — that is where results are recorded.
