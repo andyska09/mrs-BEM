@@ -2,6 +2,7 @@
 Matlab/tmp/
 Python/data/2026-*/
 Python/data/bem-*/
+Python/data/none/
 Python/train_logs/
 *.trt
 
