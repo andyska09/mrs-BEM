@@ -11,7 +11,7 @@ When listing commands to me, one command one line. If there is more than one com
 
 ## My goal, my rules and my story
 
-This repo's goal is to recreate the NeuroBEM paper and port it into the **Agilicious** simulator for closed-loop evaluation. `NeuroBEM/analysis/` is my own workspace to play with and analyze the data and outputs of the BEM model. `agilicious/simulator/` is part of the simulator I received from my supervisor (from the same lab as the paper) that implements BEM inside — the deployment target.
+This repo's goal is to recreate the NeuroBEM paper and port it into the **Agilicious** simulator for closed-loop evaluation. `NeuroBEM/analysis/` is my own workspace to play with and analyze the data and outputs of the BEM model. `agilicious/simulator/` is part of the simulator I received from my supervisor (from the same lab as the paper) that implements BEM inside — the deployment target in the future.
 
 From the MRS web page:
 
@@ -24,17 +24,15 @@ From the MRS web page:
 
 ### Current direction
 
-Advisor's steer (Michal Pliska): **(1) reproduce the paper's results, (2) try CMA-ES for BEM param tuning to see what it can find, (3) get the whole pipeline working.** Main task afterwards: **apply it to the Eagle drone in a closed-loop simulation.**
+Steer:
+(1) reproduce the paper's results, 
+(2) try CMA-ES for BEM param tuning to see what it can find
+(3) get the whole pipeline working.
+(4) try abelation - leave out features - how much the TCN degrades
+(5) study up polyfit and how it could be used here. 
 
-**Active goal (now): train the NN residual and compare results against the paper.** BEM re-identification via CMA-ES is done — many runs under `CMAES-results/` and the `processed_data/` tunes, summarized in [notes/agi_notes.md](notes/agi_notes.md). The current step is to train the TCN residual on the BEM outputs and reproduce the paper's single-step RMSE (Table I ≈ 0.352 N / 5.3e-3 Nm; Table II "BEM+NN"). Train with `Python/train.py`; compare with `generate_ablation_study.py` (per-axis RMSE + per-signal plots → `Python/eval_out/`).
+Main task afterwards: **apply it to the data from Eagle drone and then in a closed-loop simulation.**
 
-Longer arc (still stands): **port NeuroBEM (BEM+NN) into the Agilicious simulator and reproduce the paper's closed-loop tracking (Table III) entirely in sim.** Agilicious already ships the BEM rotor model; the remaining work is to wire in the NN residual and build the closed-loop eval. No mocap access — all data and ground truth come from the public NeuroBEM dataset; we never record our own flights. The 7-step onboarding recipe for a new drone is [notes/paper_pipeline_description.md](notes/paper_pipeline_description.md).
-
-- **NN residual (fixed interface):** input `20×10` (3 body linvel, 3 body rates, 4 motor speeds) @ 2.5 ms = 50 ms history; output 6 = residual force+torque added to BEM. Two heads (force/torque), strictly causal, **bounded output** (an unbounded torque residual crashed the paper's ablation), exported to C++ (ONNX Runtime / libtorch) at 1 kHz with the training normalization constants shipped alongside.
-- **Sim loop (per 1 ms tick):** low-level controller → first-order motor model → BEM+NN → rigid-body integrate. Use **symplectic Euler @ 1 ms** (Agilicious defaults to RK4 — switch it) and a BetaFlight-style rate loop, or comparisons to the paper are invalid.
-- **Evaluation ladder (in order):** (1) single-step RMSE on the held-out split (Table I target ≈ 0.352 N / 5.3e-3 Nm), (2) open-loop motor-replay rollout (position drift over ~1 s windows), (3) closed-loop MPC flying the reference trajectories vs. the recorded flights (Table III). Model selection uses trajectory drift, not per-step RMSE.
-- **CMA-ES tuning:** re-fitting the BEM aero params `(cl, cd, kβ)` from flight data (see "re-identification" below) is an explicit advisor ask — evaluate what CMA-ES can recover before touching the NN. The `processed_data/` timestamped subfolders (`2026-07-15-…` through `2026-07-23-…`) plus `bem` / `bem-vi-baseline` / `bem-007` / `bem-agi` are outputs of different tunes; each timestamp matches a `CMAES-results/<ts>/best.yaml` run. See [notes/agi_notes.md](notes/agi_notes.md) for the exact cl/cd/k and the four agilicious corrections.
-- **Out of scope until the ladder reproduces the paper:** architecture swaps, multi-step/rollout training, BEM-solver improvements.
 
 ## Repository layout
 
