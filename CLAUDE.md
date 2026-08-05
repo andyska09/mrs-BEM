@@ -28,16 +28,15 @@ Long-running steer: (1) reproduce the paper's results, (2) CMA-ES for BEM param 
 
 The near-term plan is tracked in **[PLAN.md](PLAN.md)** (root, untracked-by-design working doc — phases get added one at a time after discussion). Current state: Phase 0 (training speedup) done, Phase 1 (seeding + `rnn:` config block + sweep runner + MetaCentrum training submit) is next, Phases 2–4 are input ablation / architecture study / cross with the generalization experiment. Read PLAN.md before proposing NN-side work.
 
-**Understanding — as opposed to operating — the project lives in [wiki/](wiki/); start at [wiki/index.md](wiki/index.md).** Before answering any conceptual question (what a model assumes, why a result looks the way it does, what is still open), read the relevant wiki page rather than re-deriving. After learning something worth keeping, file it back as a wiki page per [wiki/CLAUDE.md](wiki/CLAUDE.md) — an analysis left in chat history is lost work.
-
 ## Repository layout
 
-This repo is a workspace of four loosely-coupled parts:
+This repo is a workspace of three loosely-coupled parts:
 
 - **[NeuroBEM/](NeuroBEM/)** — the main working tree: the NeuroBEM framework ([NeuroBEM/code/](NeuroBEM/code/)), my exploratory analysis ([NeuroBEM/analysis/](NeuroBEM/analysis/)), the CMA-ES reporting notebooks ([NeuroBEM/CMAES-results-analysis/](NeuroBEM/CMAES-results-analysis/)), dataset docs ([NeuroBEM/README.md](NeuroBEM/README.md), [NeuroBEM/Flights.txt](NeuroBEM/Flights.txt), [NeuroBEM/testset.txt](NeuroBEM/testset.txt)), and gitignored flight data/outputs (`processed_data/`, `raw_data/`, `pdf/`, `bem+nn/`, `CMAES-results/`). [NeuroBEM/code/README.md](NeuroBEM/code/README.md) is the authoritative end-to-end tutorial for the *pipeline*.
 - **[agilicious/simulator/](agilicious/simulator/)** — extracted Agilicious C++ simulator sources (models incl. `model_propeller_bem*.cpp` + `bem/`, the BetaFlight/simple low-level controllers, `quadrotor_simulator.cpp`), the **deployment target** for the final closed-loop sim. Reference source only — no build system or headers checked in here.
-- **[wiki/](wiki/)** — the knowledge base (replaced the old `notes/`, which was absorbed into it on 2026-08-05). **This file is the code map; the wiki is the knowledge.** If the question is *what does this mean / what do we know / what is still open*, the answer is in the wiki, not here. Start at [wiki/index.md](wiki/index.md); maintenance rules in [wiki/CLAUDE.md](wiki/CLAUDE.md). Entity-first: `concepts/`, `platforms/`, `papers/`, `experiments/`, `tools/`, `questions/`, plus [wiki/sources.md](wiki/sources.md) (curation ledger — **no external source is ingested without the user's approval**) and [wiki/log.md](wiki/log.md).
-- **[papers/](papers/)** — [papers/RSS21_Bauersfeld.pdf](papers/RSS21_Bauersfeld.pdf) (NeuroBEM) with grep-able transcription [papers/RSS21_Bauersfeld.md](papers/RSS21_Bauersfeld.md), and `scirobotics.abm6597.pdf` (Neural-Fly). The `.md` is the source of truth for *why* the code is shaped as it is.
+- **[research/](research/)** — reading material and write-ups. Two folders, nothing else: no index, no schema, no maintenance skills. Conceptual questions are answered from `sources/` + the code with a `file:line` citation.
+  - **[research/sources/](research/sources/)** — inputs. **Never edit a file here**; adding a new one is fine. [papers/](research/sources/papers/) holds each paper as PDF + a grep-able PDF→text transcription: [RSS21_Bauersfeld.md](research/sources/papers/RSS21_Bauersfeld.md) (NeuroBEM) and [scirobotics.abm6597.md](research/sources/papers/scirobotics.abm6597.md) (Neural-Fly). The transcriptions have no headings — cite them by line number. [notes/](research/sources/notes/) is my own loose notes: explorations, open questions, notes on the code under `NeuroBEM/`.
+  - **[research/reports/](research/reports/)** — findings: concise, information-dense, no fluff. **Write one only when I ask** — never file a report unprompted. Both current files (`CMAES-identification.md`, `Generalization.md`) are empty placeholders.
 
 ### Root-level dataset docs (under `NeuroBEM/`)
 
@@ -77,13 +76,13 @@ Data flows through three loosely-coupled stages that communicate via CSV files o
 - **Feature set** is the `dataloading.use_*` flags: `use_pos`(3) / `use_att`(4) / `use_angvel`(3) / `use_linvel`(3) / `use_motors`(4) / `use_base_force`(3) / `use_base_torque`(3), summed into `feature_dim` at [settings.py:105-119](NeuroBEM/code/Python/config/settings.py#L105). The paper default (angvel+linvel+motors) gives `FL = 10`; the deployed ONNX/TensorRT shape is `(1, H, FL) = (1, 20, 10)`.
 - **`dataloading.max_speed`** (new): `0` = off, otherwise drop every window whose full 50 ms span is not entirely below that body speed. Implemented as a `valid_mask` built in [loader.py:206-209](NeuroBEM/code/Python/utils/loader.py#L206) and applied to the start-index list in [window_generator.py:135-139](NeuroBEM/code/Python/utils/window_generator.py#L135) (no cross-gap splicing). Masked rows are also excluded from the normalization constants ([loader.py:257-260](NeuroBEM/code/Python/utils/loader.py#L257)). `run_inference` forces `max_speed = 0` so evaluation always sees the full envelope ([generate_ablation_study.py:20](NeuroBEM/code/Python/generate_ablation_study.py#L20)).
 - **`hardware.use_gpu`** (new, default `True` when absent): `False` calls `tf.config.set_visible_devices([], 'GPU')` ([learner.py:26-28](NeuroBEM/code/Python/learner.py#L26)). On this Mac keep it **`False`** — Metal is ~2.7× slower than the CPU for this 28k-param model. Set it `True` for a CUDA node.
-- **`window_generator.make_dataset` is a hand-rolled replacement for `keras.utils.timeseries_dataset_from_array`** ([window_generator.py:128](NeuroBEM/code/Python/utils/window_generator.py#L128)): one `tf.gather` per *batch* instead of per sample, columns pre-gathered into `[features | labels | infos]` order. Verified bitwise-identical to the keras path; do not "simplify" it back. Details and measurements in [wiki/experiments/phase0-training-speedup.md](wiki/experiments/phase0-training-speedup.md).
+- **`window_generator.make_dataset` is a hand-rolled replacement for `keras.utils.timeseries_dataset_from_array`** ([window_generator.py:128](NeuroBEM/code/Python/utils/window_generator.py#L128)): one `tf.gather` per *batch* instead of per sample, columns pre-gathered into `[features | labels | infos]` order. Verified bitwise-identical to the keras path; do not "simplify" it back.
 - **Nothing is seeded yet.** `make_dataset` draws its own shuffle seed ([window_generator.py:142](NeuroBEM/code/Python/utils/window_generator.py#L142)), so two runs of the same config differ by a few percent. Any n=1 comparison between runs is currently unfalsifiable — this is Phase 1 item 1.
 - **`RNN` has no config block**: [nets.py:180](NeuroBEM/code/Python/utils/nets.py#L180) hardcodes `LSTM(12)`, and `settings.py` only parses `tcn`/`mlp`.
 - **Evaluation**: [generate_ablation_study.py](NeuroBEM/code/Python/generate_ablation_study.py) loads `train_logs/<ts2>/best_model`, runs it over a folder **or a single CSV**, prints per-axis force/torque RMSE and writes per-signal `.png`/`.csv` to `--output_dir`. Its `run_inference(load_folder, data_root)` returns `(preds, labels, infos)` and is the shared engine of every evaluation notebook.
 - **Deployment path** (trained `.pb` → ONNX): `python3 -m tf2onnx.convert --saved-model best_model/ --output best_model/network.onnx --inputs=input_1:0[BS,H,FL]` ([code/README.md:268](NeuroBEM/code/README.md#L268)); [verify_onnx.py](NeuroBEM/code/Python/verify_onnx.py) checks ONNX == TF on a ones-input `(1,20,10)`. Agilicious runs it via **ONNX Runtime**; a TensorRT path also exists (`.trt` engine, C++ check under [NeuroBEM/code/Python/trt/](NeuroBEM/code/Python/trt/)). ONNX/engines are machine-specific and gitignored.
 
-## Model background — moved to the wiki
+## Model background
 
 The whole framework computes one equation:
 
@@ -91,20 +90,7 @@ The whole framework computes one equation:
 f = f_prop + f_res        τ = τ_prop + τ_res
 ```
 
-A **rotor model** predicts `f_prop`/`τ_prop` (stages 1–2, C++); a **neural network** predicts the residuals (stage 3, Python). Everything explanatory now lives in [wiki/](wiki/) — do not re-derive it here:
-
-| question | page |
-|---|---|
-| the split, the fixed `(20,10)→6` NN interface, deployment | [wiki/concepts/residual-learning.md](wiki/concepts/residual-learning.md) |
-| BEM algorithm, integrand, assembly | [wiki/concepts/bem.md](wiki/concepts/bem.md) |
-| induced velocity, why it needs GSL, vortex-ring state | [wiki/concepts/induced-velocity.md](wiki/concepts/induced-velocity.md) |
-| coning/flapping, `kβ`, why retuning `cl`/`cd` can't move the angles | [wiki/concepts/blade-flapping.md](wiki/concepts/blade-flapping.md) |
-| what the `MODEL` define means + full paper Table II | [wiki/concepts/rotor-models.md](wiki/concepts/rotor-models.md) |
-| spline fusion, clock skew, 29-col provenance | [wiki/concepts/flight-data-processing.md](wiki/concepts/flight-data-processing.md) |
-| every BEM parameter + the CMA-ES REGISTRY table | [wiki/concepts/bem-parameters.md](wiki/concepts/bem-parameters.md) |
-| the paper itself, with a line-reference index | [wiki/papers/neurobem.md](wiki/papers/neurobem.md) |
-| platform constants (mass/inertia variants, geometry, τΩ) | [wiki/platforms/neurobem-quad.md](wiki/platforms/neurobem-quad.md) |
-| where the paper overclaims | [wiki/questions/does-bem-generalize.md](wiki/questions/does-bem-generalize.md) |
+A **rotor model** predicts `f_prop`/`τ_prop` (stages 1–2, C++); a **neural network** predicts the residuals (stage 3, Python). The *why* — BEM derivation, induced velocity, coning/flapping, the rotor-model variants and Table II — is in [research/sources/papers/RSS21_Bauersfeld.md](research/sources/papers/RSS21_Bauersfeld.md) and the code itself.
 
 ## Exploratory analysis (`NeuroBEM/analysis/`)
 
@@ -127,7 +113,7 @@ A separate Python workspace for data-quality analysis and BEM-baseline evaluatio
 
 ### The generalization experiment (`analysis/generalization.ipynb`)
 
-Reproduces the paper's `*` result (train on ≤ 5 m/s only, test on everything). Four arms — `full` (`data/bem`), `slow` and `ctrl` (built by `speed_envelope.py` → `bem-slow` / `bem-ctrl`), `win` (`dataloading.max_speed: 5` on `data/bem`) — plus a `None`-base arm from a `MODEL -1` build. What each arm means, why `slow` vs `win` is the open question, and current status: [wiki/experiments/generalization.md](wiki/experiments/generalization.md).
+Reproduces the paper's `*` result (train on ≤ 5 m/s only, test on everything). Four arms — `full` (`data/bem`), `slow` and `ctrl` (built by `speed_envelope.py` → `bem-slow` / `bem-ctrl`), `win` (`dataloading.max_speed: 5` on `data/bem`) — plus a `None`-base arm from a `MODEL -1` build. `slow` vs `win` (reduced dataset vs. windowed filtering of the full one) is the open question.
 
 ## The main loop: tune → predictions → NN targets → split → train → tables
 
@@ -239,7 +225,7 @@ No CLI build/test harness — scripts are run inside MATLAB. Every function is d
   | dataset `README.md` / paper / `make_nn_targets.py` / `bem_settings.yaml` | 0.772 | [0.0025, 0.0021, 0.0043] |
 
   So the NN **labels** are computed with the README inertia while the **RMSE reports** use the `params.h` inertia. Small, but it means a number from `measure_bem_RMSE.py` is not bitwise the same quantity as the label the NN fits. Check which a given script uses before comparing.
-- BEM coning/flapping angles use the *linear* lift/drag coefficients (`param.a`/`param.d`); changing the *nonlinear* `param.cl`/`param.cd` will not move those angles. This is intentional (tractability), and it means the CMA-ES retunes never reach the flapping/`kβ` torque path (see [wiki/concepts/blade-flapping.md](wiki/concepts/blade-flapping.md)).
+- BEM coning/flapping angles use the *linear* lift/drag coefficients (`param.a`/`param.d`); changing the *nonlinear* `param.cl`/`param.cd` will not move those angles. This is intentional (tractability), and it means the CMA-ES retunes never reach the flapping/`kβ` torque path.
 - `Coning.m` is described in the README as fragile/"a hack" (FFT of audio to recover prop RPM) — handle with care.
 - **Batches never mix flights.** The dataset is ~170 per-file pipelines `concatenate`d ([loader.py:63-67](NeuroBEM/code/Python/utils/loader.py#L63)) with shuffling only *within* each file, so every batch comes from one flight. Known real issue, deliberately deferred (fixing it changes the gradient sequence → separate experiment).
 - Gitignored outputs you should not commit: `NeuroBEM/processed_data/`, `NeuroBEM/raw_data/`, `NeuroBEM/bem+nn/`, `NeuroBEM/pdf/`, **`NeuroBEM/CMAES-results/`**, `Python/train_logs/`, `Python/data/2026-*/`, `Python/data/bem-*/`, `Python/data/none/`, `Python/eval_out/`, `simulator/build/`, `Matlab/tmp/`, `*.trt`, `*.asv`. Note `CMAES-dataset/subset_20k.csv` **is** committed. The notebooks under `CMAES-results-analysis/` and `analysis/` **are** committed with their outputs — that is where results are recorded, since the raw `CMAES-results/` folders are not.
