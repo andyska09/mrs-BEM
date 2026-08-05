@@ -203,6 +203,11 @@ class QuadDataset(Dataset):
                               "residual_tz"
                               ]
 
+        valid_mask = None
+        if getattr(self.config, 'max_speed', 0):
+            speed = np.linalg.norm(df[["vel x", "vel y", "vel z"]].values, axis=1)
+            valid_mask = speed <= self.config.max_speed
+
         my_window = WindowGenerator(input_width=self.config.history_len,
                                     label_width=self.config.label_len,
                                     shift=self.config.label_shift,
@@ -212,7 +217,8 @@ class QuadDataset(Dataset):
                                     info_columns=self.info_features,
                                     sampling_rate=self.config.sampling_rate,
                                     batch_size=batch_size,
-                                    shuffle=self.training)
+                                    shuffle=self.training,
+                                    valid_mask=valid_mask)
         if self.debug:
             print(my_window)
             # we'll define the windows we want to use for training
@@ -248,6 +254,10 @@ class QuadDataset(Dataset):
 
         input_features_v = df[self.input_features].values
         label_features_v = df[self.label_features].values
+        if valid_mask is not None:
+            # normalization constants must not see rows above the cut
+            input_features_v = input_features_v[valid_mask]
+            label_features_v = label_features_v[valid_mask]
 
         if self.raw_inputs is None:
             self.raw_inputs = input_features_v

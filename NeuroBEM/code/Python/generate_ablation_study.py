@@ -17,6 +17,7 @@ from utils.visualization import create_plot_dict
 def run_inference(load_folder_path, root_dir):
     settings_path = os.path.join(load_folder_path, 'settings.yaml')
     settings = Settings(settings_path, generate_log=False)
+    settings.max_speed = 0  # evaluation always sees the full envelope
 
     dataset_test = create_dataset(root_dir, settings, training=False)  # , batch_size=1)
 

@@ -93,6 +93,7 @@ class Settings:
             self.label_len = dataloading['label_len']
             self.label_shift = dataloading['label_shift']
             self.sampling_rate = dataloading['sampling_rate']
+            self.max_speed = dataloading.get('max_speed', 0)
             self.input_use_pos = dataloading['use_pos']
             self.input_use_att = dataloading['use_att']
             self.input_use_linvel = dataloading['use_linvel']

@@ -5,10 +5,11 @@ import tensorflow as tf
 
 class WindowGenerator:
     def __init__(self, input_width, label_width, shift, dataframe=None, feature_columns=None, label_columns=None,
-                 info_columns=None, sampling_rate=1, batch_size=32, shuffle=False):
+                 info_columns=None, sampling_rate=1, batch_size=32, shuffle=False, valid_mask=None):
         assert shift == 0, "shift != might not be supported"
         # Store the raw data.
         self.dataframe = dataframe
+        self.valid_mask = valid_mask
 
         self.debug = False
 
@@ -131,6 +132,11 @@ class WindowGenerator:
 
         length, rate = self.total_window_size, self.sampling_rate
         start_positions = np.arange(0, len(data) - (length - 1) * rate, dtype="int32")
+        if self.valid_mask is not None:
+            # keep only windows whose full span lies inside the mask (no cross-gap splicing)
+            span = (length - 1) * rate + 1
+            bad = np.concatenate([[0], np.cumsum(~self.valid_mask)])
+            start_positions = start_positions[bad[start_positions + span] - bad[start_positions] == 0]
         seed = None
         if self.shuffle:
             seed = np.random.randint(1e6)
