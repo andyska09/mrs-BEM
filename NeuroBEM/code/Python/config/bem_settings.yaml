@@ -13,7 +13,7 @@ dataloading:
   label_len: 1        # history of output (always 1)
   label_shift: 0      # shift of label w.r.t. end of input window (always 0)
   sampling_rate: 1
-  max_speed: 0        # 0 = off; drop windows whose 50 ms span ever exceeds this body speed [m/s]
+  max_speed: 5        # 0 = off; drop windows whose 50 ms span ever exceeds this body speed [m/s]
   use_pos: False
   use_att: False
   use_linvel: True
