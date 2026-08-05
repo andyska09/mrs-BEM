@@ -26,8 +26,6 @@ From the MRS web page:
 
 Long-running steer: (1) reproduce the paper's results, (2) CMA-ES for BEM param tuning, (3) get the whole pipeline working, (4) ablations — leave out features, see how much the TCN degrades, (5) study polyfit and how it could be used here. Main task afterwards: **apply it to the data from the Eagle drone and then in a closed-loop simulation.**
 
-The near-term plan is tracked in **[PLAN.md](PLAN.md)** (root, untracked-by-design working doc — phases get added one at a time after discussion). Current state: Phase 0 (training speedup) done, Phase 1 (seeding + `rnn:` config block + sweep runner + MetaCentrum training submit) is next, Phases 2–4 are input ablation / architecture study / cross with the generalization experiment. Read PLAN.md before proposing NN-side work.
-
 ## Repository layout
 
 This repo is a workspace of three loosely-coupled parts:
@@ -53,6 +51,7 @@ Data flows through three loosely-coupled stages that communicate via CSV files o
    - The flapping/coning equations are derived symbolically in `Maple/BEM_Derivation.mw` and the generated formulae are implemented in both MATLAB subroutines and the C++ simulator (`calc_a0`/`calc_a1s`/`calc_b1s` ↔ `calculateConing.cpp` etc.). MATLAB is only a tool to produce values for C++; it is intentionally not optimized.
 
 2. **Flight-data processing (MATLAB) → base-model application (C++)** — Merge sensor sources, then run the base model over them to produce training data.
+   - `Scripts/blackboxToCSV.sh PATH` first decodes every `<ID>.BFL` in a folder to `<ID>.01.csv` (needs the external *blackbox-tools* `blackbox_decode` on `PATH`; existing CSVs are skipped, so it is safe to re-run — [code/README.md:128-139](NeuroBEM/code/README.md#L128)).
    - `Matlab/OptiTrack/MergeAndPreprocessData.m` merges Rosbag (OptiTrack pose) + Betaflight motor-speed logs + trajectory into `merged_*` and `merged_*_seg_X.csv` files. The `_seg_X` segment files (airborne portions) are the ones used downstream.
    - The C++ `bem-model` executable ([NeuroBEM/code/simulator/](NeuroBEM/code/simulator/)) reads each `merged_*_seg_*.csv`, predicts forces/torques, and writes `<MODEL>/<MODEL>_<flight>_seg_X.csv`. Run via `Scripts/applyBM.sh BASEPATH MODEL CONFIG`. It also dumps the effective aero params as `params.yaml` next to the output file ([simulator.cpp:31](NeuroBEM/code/simulator/src/simulator/simulator.cpp#L31) → `Quadcopter::log_params` → `Propeller_s/Quadcopter_s::log_params` in [params.h:132](NeuroBEM/code/simulator/include/params.h#L132)), so the run records exactly which coefficients produced it.
 
@@ -213,6 +212,7 @@ No CLI build/test harness — scripts are run inside MATLAB. Every function is d
 
 ## Conventions & gotchas
 
+- **There is no test suite anywhere** — no pytest, no CTest, no MATLAB test harness. Verification is: `predict_from_pb.py` / `verify_onnx.py` (ones-input sanity checks), `generate_ablation_study.py` (RMSE vs the paper), and the committed notebook tables. Do not go looking for tests to run; say so instead of inventing a command.
 - **NO TEMP DIRECTORIES, NO SCRATCH FILES.** Never write to `/tmp`, `/private/tmp/claude-*`, or any scratchpad. Everything must be reproducible: either put the script in the repo where it belongs, or don't write it at all and just describe what you would run.
 - **MINIMAL COMMENTS AND DOCSTRINGS.** Keep comments and docstrings to an absolute minimum — code should be self-explanatory. Keep the code itself as simple as possible.
 - **ALWAYS CHECK THE SOURCE, ALWAYS CITE IT.** Never answer factual questions about the code/data (what a value is, where a signal comes from, how something is computed) from memory, the summary, or inference — open the actual file and verify. Every claim must come with a source the user can open: `file:line` (e.g. [MergeAndPreprocessData.m:277](NeuroBEM/code/Matlab/OptiTrack/MergeAndPreprocessData.m#L277)), not a vague reference. Trace data provenance to the exact line that assigns/derives it.
