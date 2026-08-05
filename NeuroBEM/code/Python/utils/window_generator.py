@@ -31,6 +31,12 @@ class WindowGenerator:
         self.column_indices = {name: i for i, name in
                                enumerate(dataframe.columns)}
 
+        # columns are gathered once here instead of per batch in split_window
+        self.ordered_columns = list(feature_columns) + list(label_columns) + list(info_columns)
+        self.n_features = len(feature_columns)
+        self.n_labels = len(label_columns)
+        self.n_infos = len(info_columns)
+
         # Work out the window parameters.
         self.input_width = input_width
         self.label_width = label_width
@@ -75,27 +81,16 @@ class WindowGenerator:
         if self.debug:
             print("Splitting window!")
             print(features.shape)
-        inputs = features[:, self.input_slice, :]
-        labels = features[:, self.labels_slice, :]
-        infos = features[:, self.info_slice, :]
-        if self.feature_columns is not None:
-            inputs = tf.stack(
-                [inputs[:, :, self.column_indices[name]] for name in self.feature_columns],
-                axis=-1)
-        if self.label_columns is not None:
-            labels = tf.stack(
-                [labels[:, :, self.column_indices[name]] for name in self.label_columns],
-                axis=-1)
-        if self.info_columns is not None:
-            infos = tf.stack(
-                [infos[:, :, self.column_indices[name]] for name in self.info_columns],
-                axis=-1)
+        nf, nl = self.n_features, self.n_labels
+        inputs = features[:, self.input_slice, :nf]
+        labels = features[:, self.labels_slice, nf:nf + nl]
+        infos = features[:, self.info_slice, nf + nl:]
 
         # Slicing doesn't preserve static shape information, so set the shapes
         # manually. This way the `tf.data.Datasets` are easier to inspect.
-        inputs.set_shape([None, self.input_width, None])
-        labels.set_shape([None, self.label_width, None])
-        infos.set_shape([None, self.info_width, None])
+        inputs.set_shape([None, self.input_width, nf])
+        labels.set_shape([None, self.label_width, nl])
+        infos.set_shape([None, self.info_width, self.n_infos])
 
         return inputs, labels, infos
 
@@ -130,17 +125,29 @@ class WindowGenerator:
                 plt.legend()
 
     def make_dataset(self, data):
-        data = np.array(data, dtype=np.float32)
-        ds = tf.keras.preprocessing.timeseries_dataset_from_array(
-            data=data,
-            targets=None,
-            sequence_length=self.total_window_size,
-            sequence_stride=1,
-            sampling_rate=self.sampling_rate,
-            shuffle=self.shuffle,
-            batch_size=self.batch_size)
+        # Same windows, same order as keras' timeseries_dataset_from_array, but the gather is
+        # done once per batch instead of once per sample (keras costs ~29 us/sample in dispatch).
+        data = np.array(data[self.ordered_columns], dtype=np.float32)
 
-        ds = ds.map(self.split_window)
+        length, rate = self.total_window_size, self.sampling_rate
+        start_positions = np.arange(0, len(data) - (length - 1) * rate, dtype="int32")
+        seed = None
+        if self.shuffle:
+            seed = np.random.randint(1e6)
+            np.random.RandomState(seed).shuffle(start_positions)
+
+        table = tf.constant(data)
+        offsets = tf.range(length, dtype=tf.int32) * rate
+
+        def make_batch(starts):
+            return self.split_window(tf.gather(table, starts[:, None] + offsets))
+
+        ds = tf.data.Dataset.from_tensor_slices(start_positions)
+        if self.shuffle:
+            ds = ds.shuffle(buffer_size=self.batch_size * 8, seed=seed)
+        ds = ds.batch(self.batch_size)
+        ds = ds.map(make_batch, num_parallel_calls=tf.data.AUTOTUNE)
+        ds = ds.prefetch(tf.data.AUTOTUNE)
 
         return ds
 

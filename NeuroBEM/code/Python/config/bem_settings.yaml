@@ -1,4 +1,4 @@
-base_type: "bem"  # "none", "fit", "bem"
+base_type: "bem-ctrl"  # "none", "fit", "bem"
 dir:
   train: ""                  # if empty, defaults to "data/[base_type]/train
   val: ""                    # if empty, defaults to "data/[base_type]/validation
@@ -55,6 +55,7 @@ visualization:
 hardware:
   # num_cpu_workers: {-1: auto, 0: main thread, >0: ...}
   num_cpu_workers: -1
+  use_gpu: False
   gpu_device: 0
   max_memory: 1000  # max allocated memory in MB
 

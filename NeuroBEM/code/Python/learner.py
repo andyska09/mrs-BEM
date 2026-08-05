@@ -23,7 +23,10 @@ class Learner:
         physical_devices = tf.config.list_physical_devices('GPU')
         print(physical_devices)
         print(len(physical_devices))
-        if len(physical_devices) > 0:
+        if not self.config.use_gpu:
+            tf.config.set_visible_devices([], 'GPU')
+            print("GPU disabled by hardware.use_gpu, running on CPU")
+        elif len(physical_devices) > 0:
             # Restrict GPU memory allocated by TensorFlow
             try:
                 tf.config.experimental.set_virtual_device_configuration(physical_devices[0], [

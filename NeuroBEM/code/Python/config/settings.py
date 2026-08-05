@@ -22,6 +22,9 @@ class Settings:
             os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
             os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_device)
 
+            # on small models the GPU can be slower than the CPU (per-op dispatch dominates)
+            self.use_gpu = hardware.get('use_gpu', True)
+
             self.num_cpu_workers = hardware['num_cpu_workers']
             if self.num_cpu_workers < 0 and sys.version_info[0] >= 3:
                 self.num_cpu_workers = os.cpu_count()
