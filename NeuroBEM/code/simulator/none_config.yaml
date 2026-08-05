@@ -1,0 +1,27 @@
+# None model config: MODEL=-1 zeros the rotor model, drag coefficients zero the
+# body drag that quadcopter.cpp adds on top. Together = the paper's "predict all zeros".
+# Keys follow the agilicious sim yaml. All keys are required.
+bem:
+  lift_coefficient: 15.24214       # unused at MODEL=-1
+  drag_coefficient: 13.54894       # unused at MODEL=-1
+  hinge_spring_constant: 5.89      # unused at MODEL=-1
+  pitch: 21.77
+  twist: -11.0
+  chord_inner: 0.017
+  chord_outer: 0.007
+  radius: 0.064770
+  lift_offset: 0.0
+  hforce_scale: 1.0
+  num_blades: 3.0
+  air_density: 1.204
+quad:
+  thrust_scale: 1.0
+  dx: 0.078
+  dy: 0.1
+  dz: 0.027
+body_drag:
+  horizontal_drag_coefficient: 0.0   # zeroed: getForce() = drag + thrust
+  vertical_drag_coefficient: 0.0     # quadcopter.cpp:71
+  frontarea_x: 0.0054
+  frontarea_y: 0.009
+  frontarea_z: 0.006
