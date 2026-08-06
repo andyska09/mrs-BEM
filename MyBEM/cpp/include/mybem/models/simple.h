@@ -4,10 +4,8 @@
 
 namespace mybem {
 
-/* No propeller model: zero force and zero torque.
- *
- * Differs from the old MODEL -1 build, which still evaluated the flapping
- * angles and so emitted a non-zero hinge-spring torque with zero thrust. */
+/* No propeller model: zero force and zero torque. NOTE: MODEL -1 still ran the
+ * flapping angles, so it emitted a hinge-spring torque with zero thrust. */
 class NoneModel : public PropellerModel {
  public:
   const char* type() const override { return "none"; }
@@ -23,8 +21,7 @@ class NoneModel : public PropellerModel {
   bool hasFlapping() const override { return false; }
 };
 
-/* Quadratic thrust and torque fit: T = cl w^2, Q = cd w^2. No h-force, no
- * induced velocity, no flapping. */
+/* Quadratic fit: T = cl w^2, Q = cd w^2. No h-force, no vind, no flapping. */
 class QuadraticModel : public PropellerModel {
  public:
   const char* type() const override { return "quadratic"; }

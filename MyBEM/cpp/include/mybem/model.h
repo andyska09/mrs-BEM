@@ -4,9 +4,8 @@
 
 namespace mybem {
 
-/* A base model: an airframe plus an ordered list of additive components.
- * Total wrench is their sum. Tunable keys are namespaced by component
- * ("bem.lift_coefficient", "airframe.thrust_scale"). */
+/* An airframe plus an ordered list of additive components; the wrench is their
+ * sum. Tunable keys are namespaced: "bem.lift_coefficient". */
 class Model {
  public:
   static Model load(const std::string& path);

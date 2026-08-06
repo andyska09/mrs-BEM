@@ -24,9 +24,9 @@ double chordLinear(const GSLParams& p) {
   return p.ci + p.r / p.R * (p.co - p.ci);
 }
 
-/* Inner integrand over the azimuth angle. Based on Prouty, "Helicopter
- * Stability and Performance" (1990) and Gill & D'Andrea, "Propeller Thrust and
- * Drag in Forward Flight" (2016). */
+/* Inner integrand over the azimuth angle. Prouty, "Helicopter Stability and
+ * Performance" (1990); Gill, "Propeller Thrust and Drag in Forward Flight"
+ * (2016). */
 double integrandPsi(double Psi, void* param) {
   const GSLParams& p = *(const GSLParams*)param;
   const double sPsi = std::sin(Psi);
@@ -69,8 +69,8 @@ double integrandR(double r, void* param) {
   return result;
 }
 
-/* Residual between blade-element and momentum-theory thrust; its root is the
- * induced velocity. */
+/* Blade-element minus momentum-theory thrust; its root is the induced
+ * velocity. */
 double solverV1(double v1, void* param) {
   double result, error;
 

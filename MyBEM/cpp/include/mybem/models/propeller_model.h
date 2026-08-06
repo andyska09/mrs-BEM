@@ -7,11 +7,7 @@ namespace mybem {
 
 /* Base for every per-propeller aerodynamic model. Owns the kinematics, the
  * force/torque assembly and the summation over rotors; subclasses supply only
- * thrust, drag torque, h-force and induced velocity.
- *
- * Reproduces Propeller::_update + Quadcopter::_calculateThrust/_calculateTorque
- * exactly, including the asymmetry that thrust_scale is applied to summed
- * force-z only, after the moment arms have used unscaled thrust. */
+ * thrust, drag torque, h-force and induced velocity. */
 class PropellerModel : public Component {
  public:
   void add(const State&, const Airframe&, Wrench&) override;

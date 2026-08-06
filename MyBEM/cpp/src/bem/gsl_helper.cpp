@@ -60,11 +60,8 @@ double GSLHelper::_findZero() {
     v1min = -20;
     v1max = 30;
     const double flo = GSL_FN_EVAL(&F, v1min), fhi = GSL_FN_EVAL(&F, v1max);
-    if (flo * fhi >= 0) {
-      // Root not bracketed even in the widened window (e.g. extreme params
-      // during CMA-ES): clamp to the closest endpoint instead of aborting.
-      return std::abs(flo) < std::abs(fhi) ? v1min : v1max;
-    }
+    // Still not bracketed (extreme params): clamp to the closest endpoint.
+    if (flo * fhi >= 0) return std::abs(flo) < std::abs(fhi) ? v1min : v1max;
   }
   gsl_root_fsolver_set(s, &F, v1min, v1max);
   do {

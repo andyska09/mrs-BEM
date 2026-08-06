@@ -1,0 +1,31 @@
+name: bem_default
+drone: paper_quad
+models:
+  - type: bem
+    lift_coefficient: 15.24214
+    drag_coefficient: 13.54894
+    hinge_spring_constant: 5.89
+    lift_offset: 0
+    hforce_scale: 1
+    pitch: 21.77
+    twist: -11
+    chord_inner: 0.017
+    chord_outer: 0.007
+    radius: 0.06477
+    num_blades: 3
+    air_density: 1.204
+    polar: sin_cos
+    chord: linear
+    distortion: off
+  - type: body_drag
+    horizontal_drag_coefficient: 1
+    vertical_drag_coefficient: 1
+    frontarea_x: 0.0054
+    frontarea_y: 0.009
+    frontarea_z: 0.006
+    air_density: 1.204
+airframe:
+  thrust_scale: 1
+  dx: 0.078
+  dy: 0.1
+  dz: 0.027

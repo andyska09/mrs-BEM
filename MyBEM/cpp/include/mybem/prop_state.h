@@ -4,13 +4,14 @@
 
 namespace mybem {
 
-/* Kinematic state of one propeller, motor frame FRD. The derived fields are
- * filled by PropellerModel::evaluate before the model is asked for forces. */
+/* Kinematic state of one propeller, motor frame FRD. The derived fields below
+ * are filled by PropellerModel::evaluate. */
 struct PropState {
   double Omega = 0;
   Eigen::Vector3d vel = Eigen::Vector3d::Zero();
   Eigen::Vector3d rate = Eigen::Vector3d::Zero();
   bool cw = true;
+  size_t index = 0;
 
   double vhor = 0;
   double vtot = 0;

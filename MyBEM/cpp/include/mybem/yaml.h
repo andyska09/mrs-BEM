@@ -8,9 +8,8 @@ namespace mybem {
 
 using Leaf = std::map<std::string, std::string>;
 
-/* Parsed model YAML. Deliberately covers only the schema MyBEM emits:
- * top-level scalars, one `models:` list of maps, and named sub-maps. Anything
- * else is an error rather than a silent skip. */
+/* Parsed model YAML: top-level scalars, one `models:` list of maps, named
+ * sub-maps. Anything else is an error, not a silent skip. */
 struct YamlDoc {
   Leaf root;
   std::map<std::string, Leaf> sections;
@@ -21,7 +20,7 @@ struct YamlDoc {
 
 YamlDoc readYaml(const std::string& path);
 
-/* Emits the schema readYaml accepts, so a load/save round-trip is lossless. */
+/* Emits the schema readYaml accepts: load/save round-trips losslessly. */
 class YamlWriter {
  public:
   explicit YamlWriter(const std::string& path);

@@ -15,6 +15,7 @@ void PropellerModel::add(const State& s, const Airframe& af, Wrench& w) {
 
   for (size_t i = 0; i < s.mot.size() && i < offsets.size(); ++i) {
     PropState ps;
+    ps.index = i;
     ps.cw = cw[i];
     ps.Omega = s.mot[i];
     ps.rate = s.omega;
@@ -25,8 +26,7 @@ void PropellerModel::add(const State& s, const Airframe& af, Wrench& w) {
     torque_sum += pw.torque + offsets[i].cross(pw.force);
   }
 
-  // Scale applies to summed force-z only; the moment arms above already used
-  // unscaled thrust. Reproduces Quadcopter::_calculateThrust.
+  // Force-z only, after the moment arms have used unscaled thrust.
   thrust_sum[2] *= af.thrust_scale;
 
   w.force += thrust_sum;
@@ -53,7 +53,7 @@ Wrench PropellerModel::evaluate(PropState& p) {
     b1s = lateralFlapping(p);
   }
 
-  // The x-axis of BEM opposes the wind; spin() handles CW vs CCW.
+  // The x-axis of BEM opposes the wind.
   const Eigen::Matrix3d rot =
       Eigen::AngleAxisd{std::atan2(p.vel[1], p.vel[0]), Eigen::Vector3d::UnitZ()}
           .toRotationMatrix();

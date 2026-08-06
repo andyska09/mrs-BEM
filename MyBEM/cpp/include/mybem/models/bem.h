@@ -7,9 +7,8 @@
 
 namespace mybem {
 
-/* Non-linear blade element momentum model. The former POLAR / CHORD / DIST
- * preprocessor switches are runtime options; every parameter field always
- * exists regardless of which are selected. */
+/* Non-linear blade element momentum model. POLAR / CHORD / DIST are runtime
+ * options here, not #defines. */
 class BEMModel : public PropellerModel {
  public:
   const char* type() const override { return "bem"; }
@@ -26,9 +25,15 @@ class BEMModel : public PropellerModel {
   bool hasFlapping() const override { return true; }
 
  private:
+  /* One solver per rotor: GSLHelper permanently widens its bracket window on a
+   * failed bracketing, so a shared one would couple the rotors. */
+  GSLHelper& _solver(size_t index);
   void _setState(const PropState&, double v1);
 
-  GSLHelper solver_;
+  BEMParams params_;
+  PolarFn polar_fn_ = &polarSinCos;
+  ChordFn chord_fn_ = &chordLinear;
+  std::vector<std::unique_ptr<GSLHelper>> solvers_;
   std::string polar_ = "sin_cos";
   std::string chord_ = "linear";
   std::string distortion_name_ = "off";

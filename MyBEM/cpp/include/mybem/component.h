@@ -6,8 +6,7 @@
 
 namespace mybem {
 
-/* Additive force/torque contributor. Mirrors agi::ModelBase: every component
- * adds into the same wrench, the total is their sum. */
+/* Additive force/torque contributor, like agi::ModelBase. */
 class Component {
  public:
   virtual ~Component() = default;

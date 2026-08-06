@@ -5,7 +5,6 @@
 
 namespace mybem {
 
-/* Adding a component type is one include and one line here. */
 ComponentPtr createComponent(const std::string& type) {
   if (type == "bem") return std::make_unique<BEMModel>();
   if (type == "quadratic") return std::make_unique<QuadraticModel>();

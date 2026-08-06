@@ -11,8 +11,8 @@ namespace mybem {
 
 constexpr int kMaxIter = 100;
 
-/* Blade-element parameters. Every field always exists; which ones are read
- * depends on the polar and chord function selected at load. */
+/* Blade-element parameters. Which fields are read depends on the polar and
+ * chord function selected at load. */
 struct BEMParams {
   double rho = 1.204;
   double R = 5.1 * 2.54 / 2 * 1e-2;
@@ -46,9 +46,8 @@ void polarStall(const GSLParams&, double alpha, double& cl, double& cd);
 double chordConstant(const GSLParams&);
 double chordLinear(const GSLParams&);
 
-/* Passed to GSL as a void*. The polar and chord choices are function pointers
- * rather than virtual calls: this struct is read in the innermost loop of a
- * nested adaptive quadrature. */
+/* Passed to GSL as a void*. Polar and chord are function pointers, not virtual
+ * calls: this is the innermost loop of a nested adaptive quadrature. */
 struct GSLParams : BEMParams {
   double Omega = 0;
   double vtot = 0;

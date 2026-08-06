@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cmath>
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Dense>
+#include <Eigen/Core>
+#include <Eigen/Dense>
 #include <map>
 #include <string>
 #include <vector>
@@ -51,15 +51,15 @@ struct TunableParam {
   double def, lo, hi;
 };
 
-/* Rotor placement and the scale applied to summed propeller thrust. Not a
- * component: it is the container the components act on. */
+/* Rotor placement and the scale on summed propeller thrust. Not a component:
+ * it is what the components act on. */
 struct Airframe {
   double dx = 0.078;
   double dy = 0.100;
   double dz = 0.027;
   double thrust_scale = 1.0;
 
-  /* Order matches the dataset: back-right, front-right, back-left, front-left. */
+  /* Dataset order: back-right, front-right, back-left, front-left. */
   std::vector<Eigen::Vector3d> offsets() const {
     return {{-dx, dy, dz}, {dx, dy, dz}, {-dx, -dy, dz}, {dx, -dy, dz}};
   }
