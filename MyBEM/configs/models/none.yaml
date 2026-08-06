@@ -1,0 +1,9 @@
+name: none
+drone: paper_quad
+models:
+  - type: none
+airframe:
+  thrust_scale: 1
+  dx: 0.078
+  dy: 0.1
+  dz: 0.027

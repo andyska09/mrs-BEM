@@ -18,7 +18,24 @@ endif ()
 
 find_package(GSL REQUIRED)
 if (ENABLE_PARALLEL)
+    # AppleClang ships no OpenMP runtime, so FindOpenMP fails unless it is
+    # pointed at brew's libomp. On gcc/clang elsewhere this block is a no-op.
+    if (APPLE AND NOT OpenMP_CXX_FLAGS)
+        execute_process(COMMAND brew --prefix libomp
+                OUTPUT_VARIABLE LIBOMP OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+        if (EXISTS "${LIBOMP}/lib/libomp.dylib")
+            set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I${LIBOMP}/include")
+            set(OpenMP_CXX_LIB_NAMES omp)
+            set(OpenMP_omp_LIBRARY "${LIBOMP}/lib/libomp.dylib")
+        endif ()
+    endif ()
     find_package(OpenMP)
+    if (NOT OpenMP_CXX_FOUND)
+        message(FATAL_ERROR
+                "OpenMP not found (apt: libgomp, brew: install libomp, "
+                "MetaCentrum: module add gcc). Pass -DENABLE_PARALLEL=OFF to "
+                "build serial.")
+    endif ()
 endif ()
 
 # No version floor: Eigen's config matches same-major-version, so asking for
@@ -41,6 +58,8 @@ add_library(mybem_sim
         src/registry.cpp
         src/io/yaml.cpp
         src/io/csv.cpp
+        src/io/drone.cpp
+        src/tune/cma.cpp
         src/models/propeller_model.cpp
         src/models/simple.cpp
         src/models/bem.cpp
@@ -75,3 +94,7 @@ endif ()
 
 add_executable(mybem-apply src/apps/apply.cpp)
 target_link_libraries(mybem-apply mybem_sim)
+
+# OpenMP flags reach this target through mybem_sim's PUBLIC link.
+add_executable(mybem-tune src/apps/tune.cpp)
+target_link_libraries(mybem-tune mybem_sim)
