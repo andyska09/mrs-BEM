@@ -1,13 +1,14 @@
 #!/bin/bash
 # ./apply.sh BASEPATH MODEL CONFIG [filelist]
 #   BASEPATH  directory holding merged_*_seg_*.csv
-#   MODEL     output subfolder, created under BASEPATH
+#   MODEL     output subfolder, created under MyBEM/store/preds/
 #   CONFIG    model yaml
 #   filelist  optional file of <flight>_seg_X ids; default is every segment
 # Existing outputs are skipped.
 set -euo pipefail
 
-BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/cpp/build/mybem-apply"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BIN="$ROOT/cpp/build/mybem-apply"
 
 if [ $# -lt 3 ]; then
     echo "usage: ./apply.sh BASEPATH MODEL CONFIG [filelist]"
@@ -15,7 +16,7 @@ if [ $# -lt 3 ]; then
 fi
 
 base="${1%/}"
-out="$base/$2"
+out="$ROOT/store/preds/$2"
 config="$3"
 mkdir -p "$out"
 
