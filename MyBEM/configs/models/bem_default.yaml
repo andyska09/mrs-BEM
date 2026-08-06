@@ -16,7 +16,6 @@ models:
     air_density: 1.204
     polar: sin_cos
     chord: linear
-    distortion: off
   - type: body_drag
     horizontal_drag_coefficient: 1
     vertical_drag_coefficient: 1

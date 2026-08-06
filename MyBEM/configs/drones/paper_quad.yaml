@@ -1,0 +1,7 @@
+name: paper_quad
+mass: 0.772
+inertia: [0.00254, 0.00214, 0.00436]
+n_rotors: 4
+columns: optitrack_v1
+frame: flu
+rate: 400
