@@ -1,3 +1,5 @@
+#include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -46,8 +48,11 @@ int main(int argc, char** argv) {
   s.dmot.resize(4);
   double row[7];
 
+  double sum = 0, sum_sq = 0;
+
   // Sequential on purpose: GSLHelper carries its bracket window across rows.
   for (size_t i = 0; i < in.rows(); ++i) {
+    const auto t0 = std::chrono::steady_clock::now();
     const double* d = in.row(i);
     s.vel = flu2frd(Eigen::Vector3d{d[kVel], d[kVel + 1], d[kVel + 2]});
     s.omega =
@@ -63,8 +68,17 @@ int main(int argc, char** argv) {
     memcpy(row + 1, f.data(), 3 * sizeof(double));
     memcpy(row + 4, t.data(), 3 * sizeof(double));
     out.add(row);
+
+    const double dt = std::chrono::duration<double, std::micro>(
+                          std::chrono::steady_clock::now() - t0)
+                          .count();
+    sum += dt;
+    sum_sq += dt * dt;
   }
 
-  printf("%s: %zu rows\n", argv[3], in.rows());
+  const double n = static_cast<double>(in.rows());
+  const double mean = sum / n;
+  printf("%s: %zu rows, %.1f +- %.2f us/row\n", argv[3], in.rows(), mean,
+         std::sqrt(sum_sq / n - mean * mean));
   return 0;
 }
