@@ -51,7 +51,6 @@ void BEMModel::load(const Params& p, const Options& o) {
 
   polar_ = opt(o, "polar", "sin_cos");
   chord_ = opt(o, "chord", "linear");
-  distortion_name_ = opt(o, "distortion", "off");
 
   if (polar_ == "sin_cos")
     polar_fn_ = &polarSinCos;
@@ -67,14 +66,11 @@ void BEMModel::load(const Params& p, const Options& o) {
   else
     fail("unknown chord '" + chord_ + "' (linear | constant)");
 
-  if (distortion_name_ == "off")
-    distortion_ = false;
-  else if (distortion_name_ == "velocity")
-    distortion_ = true;
-  else
-    fail("unknown distortion '" + distortion_name_ + "' (off | velocity)");
-
   solvers_.clear();
+}
+
+void BEMModel::reserve(size_t n_rotors) {
+  if (n_rotors) _solver(n_rotors - 1);
 }
 
 GSLHelper& BEMModel::_solver(size_t index) {
@@ -111,7 +107,7 @@ Params BEMModel::params() const {
 }
 
 Options BEMModel::options() const {
-  return {{"polar", polar_}, {"chord", chord_}, {"distortion", distortion_name_}};
+  return {{"polar", polar_}, {"chord", chord_}};
 }
 
 /* Full set regardless of the active polar/chord; unread entries have no
@@ -138,7 +134,7 @@ std::vector<TunableParam> BEMModel::tunables() const {
 
 void BEMModel::_setState(const PropState& p, double v1) {
   _solver(p.index)
-      .setPropellerState(p.Omega, p.vtot, p.vel[2], p.K, p.alpha, p.mu, v1);
+      .setPropellerState(p.Omega, p.vtot, p.vel[2], p.alpha, p.mu, v1);
 }
 
 double BEMModel::inducedVelocity(const PropState& p) {

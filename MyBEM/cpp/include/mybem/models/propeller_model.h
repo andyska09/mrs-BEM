@@ -19,12 +19,15 @@ class PropellerModel : public Component {
   virtual double inducedVelocity(const PropState&) = 0;
   virtual bool hasFlapping() const = 0;
 
+  /* Allocate whatever per-rotor state the subclass keeps. Called before the
+   * rotor loop, which runs in parallel and must not allocate. */
+  virtual void reserve(size_t n_rotors) {}
+
   Wrench evaluate(PropState&);
 
   double radius_ = 5.1 * 2.54 / 2 * 1e-2;
   double k_ = 5.89;
   double hforce_scale_ = 1.0;
-  bool distortion_ = false;
 };
 
 }  // namespace mybem

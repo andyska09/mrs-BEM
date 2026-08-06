@@ -1,19 +1,30 @@
 #include "mybem/models/propeller_model.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "mybem/bem/flapping.h"
+
+/* OpenMP has no built-in reduction for Eigen types. */
+#pragma omp declare reduction(+ : Eigen::Vector3d : omp_out += omp_in) \
+    initializer(omp_priv = Eigen::Vector3d::Zero())
 
 namespace mybem {
 
 void PropellerModel::add(const State& s, const Airframe& af, Wrench& w) {
   const std::vector<Eigen::Vector3d> offsets = af.offsets();
   const std::vector<bool>& cw = Airframe::spinCW();
+  const int n = static_cast<int>(std::min(s.mot.size(), offsets.size()));
+  reserve(n);
 
   Eigen::Vector3d thrust_sum = Eigen::Vector3d::Zero();
   Eigen::Vector3d torque_sum = Eigen::Vector3d::Zero();
 
-  for (size_t i = 0; i < s.mot.size() && i < offsets.size(); ++i) {
+  /* The rotors are independent and each owns its solver, so they evaluate in
+   * parallel. Nested inside the tuner's sample loop this collapses to serial
+   * (omp_set_max_active_levels(1)). */
+#pragma omp parallel for num_threads(n) reduction(+ : thrust_sum, torque_sum)
+  for (int i = 0; i < n; ++i) {
     PropState ps;
     ps.index = i;
     ps.cw = cw[i];
@@ -36,7 +47,6 @@ void PropellerModel::add(const State& s, const Airframe& af, Wrench& w) {
 Wrench PropellerModel::evaluate(PropState& p) {
   p.vhor = std::sqrt(p.vel[0] * p.vel[0] + p.vel[1] * p.vel[1]) + 1e-6;
   p.vtot = std::sqrt(p.vhor * p.vhor + p.vel[2] * p.vel[2]) + 1e-6;
-  p.K = distortion_ ? std::fmin(0.25 * p.vhor, 1) : 0;
   p.alpha =
       std::fabs(p.vel[2]) < 1e-6 ? 0 : std::atan2(p.vel[2], p.vhor);
   p.mu = std::fabs(p.Omega) < 1 ? 0 : p.vhor / (p.Omega * radius_);

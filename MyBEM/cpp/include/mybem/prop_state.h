@@ -15,7 +15,6 @@ struct PropState {
 
   double vhor = 0;
   double vtot = 0;
-  double K = 0;
   double alpha = 0;
   double mu = 0;
   double vind = 0;

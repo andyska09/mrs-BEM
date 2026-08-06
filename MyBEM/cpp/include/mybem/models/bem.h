@@ -7,8 +7,8 @@
 
 namespace mybem {
 
-/* Non-linear blade element momentum model. POLAR / CHORD / DIST are runtime
- * options here, not #defines. */
+/* Non-linear blade element momentum model. POLAR / CHORD are runtime options
+ * here, not #defines. */
 class BEMModel : public PropellerModel {
  public:
   const char* type() const override { return "bem"; }
@@ -23,6 +23,7 @@ class BEMModel : public PropellerModel {
   double hforce(const PropState&) override;
   double inducedVelocity(const PropState&) override;
   bool hasFlapping() const override { return true; }
+  void reserve(size_t n_rotors) override;
 
  private:
   /* One solver per rotor: GSLHelper permanently widens its bracket window on a
@@ -36,7 +37,6 @@ class BEMModel : public PropellerModel {
   std::vector<std::unique_ptr<GSLHelper>> solvers_;
   std::string polar_ = "sin_cos";
   std::string chord_ = "linear";
-  std::string distortion_name_ = "off";
 };
 
 }  // namespace mybem

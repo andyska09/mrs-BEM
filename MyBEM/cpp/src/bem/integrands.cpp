@@ -33,7 +33,7 @@ double integrandPsi(double Psi, void* param) {
   const double cPsi = std::cos(Psi);
   const double beta = p.a0 - p.a1s * cPsi - p.b1s * sPsi;
   const double U_T = p.Omega * (p.r + p.R * p.mu * sPsi);
-  const double U_P = p.vver - p.v1 * (1 + p.K * p.r / p.R * cPsi) -
+  const double U_P = p.vver - p.v1 -
                      p.r * p.Omega * (p.a1s * sPsi + p.b1s * cPsi) -
                      p.vver * beta * cPsi;
   const double phi = std::atan2(U_P, U_T);

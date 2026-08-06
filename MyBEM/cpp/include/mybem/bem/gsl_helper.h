@@ -60,7 +60,6 @@ struct GSLParams : BEMParams {
   double b1s = 0;
   double r = 0;
   double v1 = 0;
-  double K = 0;
   char type = 0;
 
   PolarFn polar = &polarSinCos;
@@ -90,8 +89,8 @@ class GSLHelper {
   double integrateThrust();
   double integrateTorque();
   double integrateHForce();
-  void setPropellerState(double Omega, double vtot, double vver, double K,
-                         double alpha, double mu, double v1 = 0, double a0 = 0,
+  void setPropellerState(double Omega, double vtot, double vver, double alpha,
+                         double mu, double v1 = 0, double a0 = 0,
                          double a1s = 0, double b1s = 0);
   void setv1(double v1) { p.v1 = v1; }
 

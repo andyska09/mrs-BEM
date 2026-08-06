@@ -100,11 +100,10 @@ double GSLHelper::_integrate(double (*function)(double, void*)) {
 }
 
 void GSLHelper::setPropellerState(double Omega, double vtot, double vver,
-                                  double K, double alpha, double mu, double v1,
-                                  double a0, double a1s, double b1s) {
+                                  double alpha, double mu, double v1, double a0,
+                                  double a1s, double b1s) {
   p.Omega = Omega;
   p.vtot = vtot;
-  p.K = K;
   p.vver = vver;
   p.alpha = alpha;
   p.mu = mu;
