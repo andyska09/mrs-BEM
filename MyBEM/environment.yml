@@ -1,0 +1,16 @@
+# Everything from pip: conda-forge numpy links llvm-openmp, the torch wheel bundles
+# its own libomp, and two OpenMP runtimes in one process abort on import.
+name: mybem
+channels:
+  - conda-forge
+dependencies:
+  - python=3.14
+  - pip
+  - pip:
+      - numpy
+      - pandas
+      - pyyaml
+      - matplotlib
+      - tqdm
+      - torch
+      - tensorboard

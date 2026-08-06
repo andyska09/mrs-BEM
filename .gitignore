@@ -3,3 +3,5 @@
 MyBEM/cpp/build
 MyBEM/store
 /data/
+
+**/__pycache__/
