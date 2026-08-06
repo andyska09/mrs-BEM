@@ -10,7 +10,7 @@ void BodyDrag::add(const State& s, const Airframe&, Wrench& w) {
   w.force += drag;
 }
 
-void BodyDrag::load(const Params& p) {
+void BodyDrag::load(const Params& p, const Options&) {
   rho_ = p.at("air_density");
   cxy_ = p.at("horizontal_drag_coefficient");
   cz_ = p.at("vertical_drag_coefficient");

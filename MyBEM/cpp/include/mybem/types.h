@@ -9,7 +9,10 @@
 
 namespace mybem {
 
+/* Numeric parameters: everything CMA-ES can move. */
 using Params = std::map<std::string, double>;
+/* Structural choices: polar form, chord law, on/off switches. Never tuned. */
+using Options = std::map<std::string, std::string>;
 
 inline constexpr double toRad(double deg) { return deg * M_PI / 180.0; }
 inline constexpr double toDeg(double rad) { return rad / M_PI * 180.0; }

@@ -8,7 +8,9 @@ void MotorReaction::add(const State& s, const Airframe&, Wrench& w) {
     w.torque[2] -= (cw[i] ? 1.0 : -1.0) * s.dmot[i] * inertia_;
 }
 
-void MotorReaction::load(const Params& p) { inertia_ = p.at("motor_inertia"); }
+void MotorReaction::load(const Params& p, const Options&) {
+  inertia_ = p.at("motor_inertia");
+}
 
 Params MotorReaction::params() const { return {{"motor_inertia", inertia_}}; }
 

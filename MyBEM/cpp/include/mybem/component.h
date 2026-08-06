@@ -14,8 +14,9 @@ class Component {
 
   virtual const char* type() const = 0;
   virtual void add(const State&, const Airframe&, Wrench&) = 0;
-  virtual void load(const Params&) = 0;
+  virtual void load(const Params&, const Options&) = 0;
   virtual Params params() const = 0;
+  virtual Options options() const { return {}; }
   virtual std::vector<TunableParam> tunables() const = 0;
 
   virtual std::vector<std::string> diagnostics() const { return {}; }

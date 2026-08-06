@@ -10,7 +10,7 @@ class BodyDrag : public Component {
  public:
   const char* type() const override { return "body_drag"; }
   void add(const State&, const Airframe&, Wrench&) override;
-  void load(const Params&) override;
+  void load(const Params&, const Options&) override;
   Params params() const override;
   std::vector<TunableParam> tunables() const override;
 
