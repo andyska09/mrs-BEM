@@ -1,26 +1,30 @@
 #!/bin/bash
-# usage: apply.sh [MODEL.yaml] [OUTDIR] [IDLIST]
+# ./apply.sh BASEPATH MODEL CONFIG [filelist]
+#   BASEPATH  directory holding merged_*_seg_*.csv
+#   MODEL     output subfolder, created under BASEPATH
+#   CONFIG    model yaml
+#   filelist  optional file of <flight>_seg_X ids; default is every segment
+# Existing outputs are skipped.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/cpp/build/mybem-apply"
 
-MODEL="${1:-$ROOT/configs/models/bem_default.yaml}"
-OUT="${2:-$ROOT/store/preds/$(basename "$MODEL" .yaml)}"
-IDS="${3:-$ROOT/../NeuroBEM/testset.txt}"
-SRC="$ROOT/../NeuroBEM/processed_data"
+if [ $# -lt 3 ]; then
+    echo "usage: ./apply.sh BASEPATH MODEL CONFIG [filelist]"
+    exit 1
+fi
 
-mkdir -p "$OUT"
+base="${1%/}"
+out="$base/$2"
+config="$3"
+mkdir -p "$out"
 
-n=0
-while read -r id; do
-    [ -z "$id" ] && continue
-    in="$SRC/merged_$id.csv"
-    if [ ! -f "$in" ]; then
-        echo "missing: $in"
-        continue
-    fi
-    "$ROOT/cpp/build/mybem-apply" "$MODEL" "$in" "$OUT/$id.csv"
-    n=$((n + 1))
-done < "$IDS"
+if [ -n "${4:-}" ]; then
+    ids=$(cat "$4")
+else
+    ids=$(ls "$base"/merged_*seg*.csv | sed 's|.*/merged_||; s|\.csv$||')
+fi
 
-echo "$n segments -> $OUT"
+for id in $ids; do
+    [ -f "$out/$id.csv" ] || "$BIN" "$config" "$base/merged_$id.csv" "$out/$id.csv"
+done
