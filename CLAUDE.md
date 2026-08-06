@@ -24,12 +24,15 @@ From the MRS web page:
 
 ### Current direction
 
+New work goes in **[MyBEM/](MyBEM/)**, not in `NeuroBEM/` — the latter is the frozen paper reference and cross-check.
+
 Long-running steer: (1) reproduce the paper's results, (2) CMA-ES for BEM param tuning, (3) get the whole pipeline working, (4) ablations — leave out features, see how much the TCN degrades, (5) study polyfit and how it could be used here. Main task afterwards: **apply it to the data from the Eagle drone and then in a closed-loop simulation.**
 
 ## Repository layout
 
-This repo is a workspace of three loosely-coupled parts:
+This repo is a workspace of four loosely-coupled parts:
 
+- **[MyBEM/](MyBEM/)** — **the active rebuild.** A clean-break reimplementation of the whole pipeline as independent, composable stages with explicit artifacts. Spec in [MyBEM/DESIGN.md](MyBEM/DESIGN.md); only the C++ half exists so far. See the MyBEM section below.
 - **[NeuroBEM/](NeuroBEM/)** — the main working tree: the NeuroBEM framework ([NeuroBEM/code/](NeuroBEM/code/)), my exploratory analysis ([NeuroBEM/analysis/](NeuroBEM/analysis/)), the CMA-ES reporting notebooks ([NeuroBEM/CMAES-results-analysis/](NeuroBEM/CMAES-results-analysis/)), dataset docs ([NeuroBEM/README.md](NeuroBEM/README.md), [NeuroBEM/Flights.txt](NeuroBEM/Flights.txt), [NeuroBEM/testset.txt](NeuroBEM/testset.txt)), and gitignored flight data/outputs (`processed_data/`, `raw_data/`, `pdf/`, `bem+nn/`, `CMAES-results/`). [NeuroBEM/code/README.md](NeuroBEM/code/README.md) is the authoritative end-to-end tutorial for the *pipeline*.
 - **[agilicious/simulator/](agilicious/simulator/)** — extracted Agilicious C++ simulator sources (models incl. `model_propeller_bem*.cpp` + `bem/`, the BetaFlight/simple low-level controllers, `quadrotor_simulator.cpp`), the **deployment target** for the final closed-loop sim. Reference source only — no build system or headers checked in here.
 - **[research/](research/)** — reading material and write-ups. Two folders, nothing else: no index, no schema, no maintenance skills. Conceptual questions are answered from `sources/` + the code with a `file:line` citation.
@@ -42,7 +45,85 @@ This repo is a workspace of three loosely-coupled parts:
 - [NeuroBEM/Flights.txt](NeuroBEM/Flights.txt) — catalog of all 95 flights as MATLAB `dataset = "<timestamp>"` lines, each commented with its trajectory type.
 - [NeuroBEM/testset.txt](NeuroBEM/testset.txt) — 13 held-out `<ID>_seg_X` segments (dataset-level hold-out). The pipeline's own `testset.txt` consumed by `get_datafiles.bash` lives under [NeuroBEM/code/Python/data/](NeuroBEM/code/Python/data/).
 
-## Architecture: the three-stage pipeline
+## MyBEM — the rebuild (active work)
+
+A clean-break reimplementation of the pipeline. `NeuroBEM/` stays frozen as the paper reference and the fallback/cross-check; nothing is imported from it except the merged flight CSVs. **[MyBEM/DESIGN.md](MyBEM/DESIGN.md) is the spec** — §1 (four artifact kinds), §5 (CLI), §6 (C++ architecture), §10 (decisions/non-goals). §10 "OPEN" is empty: the spec is settled, don't relitigate it.
+
+**What exists today: the C++ half only.** Two binaries (`mybem-apply`, `mybem-tune`) + the `mybem_sim` library, ~1500 lines under [MyBEM/cpp/](MyBEM/cpp/). The `mybem/` Python package, the `mybem` CLI, the corpus/train/eval stages, and the `store/<kind>/<name>@<hash6>/` artifact layout of DESIGN §2.2 are **not written**. `Component::diagnose()`/`diagnostics()` ([component.h:21-22](MyBEM/cpp/include/mybem/component.h#L21)) are declared and never called.
+
+### The object model
+
+Two type aliases are the whole trick that killed the `#define`s ([types.h:13-15](MyBEM/cpp/include/mybem/types.h#L13)): `Params = map<string,double>` (everything CMA-ES can move) and `Options = map<string,string>` (structural — polar form, chord law, on/off — never tuned).
+
+- **`Component`** ([component.h:10](MyBEM/cpp/include/mybem/component.h#L10)) — an additive `+=` contributor, shaped like `agi::ModelBase`: `add(State, Airframe, Wrench&)`, `load(Params, Options)`, `params()`, `tunables()`. `tunables()` returns `{key, def, lo, hi}` and is the **per-component replacement for the old global 21-entry `REGISTRY`**.
+- **`Model`** ([model.cpp](MyBEM/cpp/src/model.cpp)) — an `Airframe` + an ordered `vector<ComponentPtr>`; `evaluate()` is a three-line sum ([model.cpp:108](MyBEM/cpp/src/model.cpp#L108)). Loading is **strict**: any unknown key `exit(1)`s ([model.cpp:71](MyBEM/cpp/src/model.cpp#L71)). Numeric YAML values route to `Params`, non-numeric to `Options`. Duplicate component types get suffixed prefixes (`bem`, `bem_2`), and `tunables()`/`values()`/`set()` namespace every key as `bem.lift_coefficient`, `airframe.dx` ([model.cpp:114-160](MyBEM/cpp/src/model.cpp#L114)).
+- **`Airframe`** ([types.h:56](MyBEM/cpp/include/mybem/types.h#L56)) — `dx,dy,dz,thrust_scale` + `offsets()` and the hardcoded spin pattern `{CW,CCW,CCW,CW}`. Not a component; it is what components act on. Its params are tunable as `airframe.*`.
+- **`Drone`** ([drone.h:9](MyBEM/cpp/include/mybem/drone.h#L9)) — mass + inertia, **the only place they are defined**, loaded from `configs/drones/*.yaml`. `Drone::measured()` is the sole measured-force/torque conversion. This kills the three-inconsistent-mass/inertia-sets problem of the old stack (see the gotcha table below).
+- **`PropellerModel`** ([propeller_model.cpp](MyBEM/cpp/src/models/propeller_model.cpp)) — base for anything per-rotor; owns the rotor loop, kinematics (`vel = v_body + ω × offset`), and force/torque assembly. Subclasses supply only `thrust`/`torque`/`hforce`/`inducedVelocity`/`hasFlapping`. `add()` scales **only `force[2]`** by `thrust_scale`, *after* the moment arms used unscaled thrust ([propeller_model.cpp:40](MyBEM/cpp/src/models/propeller_model.cpp#L40)) — matches the original ordering.
+- **Component registry** — five types, one `if` each ([registry.cpp:8](MyBEM/cpp/src/registry.cpp#L8)): `bem`, `quadratic`, `none`, `body_drag`, `motor_reaction`. Adding `polyfit` = one file + one line.
+- `BEMModel` resolves `polar`/`chord`/`distortion` strings to function pointers in `load()` ([bem.cpp:56-75](MyBEM/cpp/src/models/bem.cpp#L56)); `GSLParams` carries them as plain fn pointers so the hot path inside the nested `qags` gets an indirect call, not a virtual one. One `GSLHelper` **per rotor**, lazily ([bem.h:29-31](MyBEM/cpp/include/mybem/models/bem.h#L29)) — deliberate, since the helper permanently widens its bracket window after a failed bracketing and a shared one would couple the rotors.
+- BEM numerics (`gsl_helper.cpp`, `integrands.cpp`) and the three flapping polynomials (`coning.cpp`, `longitudinal_flapping.cpp`, `lateral_flapping.cpp`) are the **unchanged** Maple-generated math, restructured into free functions over `PropState`. The `cl`/`cd`-baked-into-the-constants limitation is stated at [flapping.h:7-9](MyBEM/cpp/include/mybem/bem/flapping.h#L7).
+
+### Config = the model
+
+`configs/models/bem_default.yaml`: root scalars (`name`, `drone`), an ordered `models:` list of additive components, and an `airframe:` block. `models: [bem]`, `[quadratic, body_drag]`, `[bem, motor_reaction, body_drag]` — all config lines, **no rebuild**. `yaml.cpp` is a hand-rolled ~90-line parser accepting exactly that one schema; anything else is a hard error with `file:line`. `Model::save` round-trips losslessly, emitting the fully-resolved config including defaults you never wrote.
+
+### Commands
+
+Build:
+```
+cmake -S MyBEM/cpp -B MyBEM/cpp/build && cmake --build MyBEM/cpp/build
+```
+Apply a model to one segment (7-col output + `params.yaml` written next to it):
+```
+MyBEM/cpp/build/mybem-apply configs/models/bem_default.yaml INPUT.csv OUTPUT.csv
+```
+Batch over an ID list ([scripts/apply.sh](MyBEM/scripts/apply.sh), defaults: `bem_default.yaml`, `store/preds/<model>/`, `NeuroBEM/testset.txt`):
+```
+MyBEM/scripts/apply.sh [MODEL.yaml] [OUTDIR] [IDLIST]
+```
+List a model's tunable names, report RMSE at the loaded values, and fit ([tune.cpp:320](MyBEM/cpp/src/apps/tune.cpp#L320)):
+```
+MyBEM/cpp/build/mybem-tune MODEL.yaml DATA.csv --list
+MyBEM/cpp/build/mybem-tune MODEL.yaml DATA.csv --drone configs/drones/paper_quad.yaml
+MyBEM/cpp/build/mybem-tune MODEL.yaml DATA.csv --drone configs/drones/paper_quad.yaml --free lift_coefficient,drag_coefficient,hinge_spring_constant --loss both --out RUNDIR
+```
+`--free NAMES|all` replaces the old `--cma MASK` bit string; a bare name is accepted when exactly one component offers it, otherwise write `bem.lift_coefficient` ([tune.cpp:263](MyBEM/cpp/src/apps/tune.cpp#L263)). `--free` requires `--out`. Other flags: `--gens` (100), `--seed` (0), `--threads`, `--loss force|torque|both` (default `both`). Output dir gets `model.yaml` (a full config — feed it straight back to `mybem-apply` or resume a tune from it), `convergence.csv`, `metrics.csv` (baseline + best rows), `tune.yaml` (run record).
+
+### mybem-apply / mybem-tune I/O
+
+Both read a `merged_*_seg_X.csv` (≥29 cols, header, FLU) and take exactly the slices they need — `mybem-apply` reads angvel@4, linvel@14, motors@20, motor-accel@24 plus col 0 ([apply.cpp:13-17](MyBEM/cpp/src/apps/apply.cpp#L13)); `mybem-tune` additionally reads angacc@1 and acc@11 to build the measured wrench ([tune.cpp:28-34](MyBEM/cpp/src/apps/tune.cpp#L28)). Position and attitude are never read, because no component uses them. Internals are **FRD**; `flu2frd`/`frd2flu` convert at the boundary. Output is 7 columns, no header, `%.12g`: `t, fx, fy, fz, tx, ty, tz` (FLU).
+
+CMA-ES is a from-scratch (mu/mu_w, lambda) implementation ([cma.cpp](MyBEM/cpp/src/tune/cma.cpp)) that knows nothing about the objective — bounds and scaling live in `SearchSpace` ([tune.cpp:147](MyBEM/cpp/src/apps/tune.cpp#L147)), which centres x-space on the **loaded model's current values**, not the hardcoded defaults, so a tune resumes from its own output. Loss is per-term MSE normalized by the baseline MSE, so the starting objective is exactly 1 per active term ([tune.cpp:386](MyBEM/cpp/src/apps/tune.cpp#L386)).
+
+### Behavioral deltas vs. the old `bem-model` — do not treat these as bugs
+
+- **Output shape**: 7 cols (t + 6), not the old 35 (29 passthrough + 6). Nothing yet bridges to the 41-col layout `make_nn_targets.py`/`loader.py` expect; DESIGN §3.2 puts that join in the unwritten Python (positional, with a row-count + `t`-column check).
+- **Precision**: `%lf` (6 decimal places) → `%.12g`. On ~1e-3 Nm torques the old writer kept ~3 significant digits. Numbers will differ from `processed_data/bem/`, and **the new ones are correct** — the acceptance-test caveat in DESIGN §9.4.
+- **`none` is now genuinely zero.** Old `MODEL -1` skipped thrust but still ran the flapping angles, emitting a hinge-spring torque at zero thrust. `NoneModel::hasFlapping()` returns false ([simple.h:21](MyBEM/cpp/include/mybem/models/simple.h#L21)). The None-base generalization arm changes.
+- **`motor_reaction` can actually fire.** The original read `domega` but never called `setMotorAcceleration`, so the term was dead; `apply.cpp:56` fills `s.dmot` for real. It is absent from `bem_default.yaml`, so the default stays faithful — add it and you get a term the old pipeline never had.
+- **`body_drag` is opt-in**; the old code had no off switch.
+- **No caching.** The `_valid`/`_validv1` dirty flags are gone; every `evaluate` recomputes.
+- **Parallelism moved.** The rotor loop is `omp parallel for` ([propeller_model.cpp:26](MyBEM/cpp/src/models/propeller_model.cpp#L26)); `mybem-tune` parallelizes across *samples* with one `Model` per thread and `omp_set_max_active_levels(1)`, which collapses the inner rotor loop to serial ([tune.cpp:354](MyBEM/cpp/src/apps/tune.cpp#L354)). The row loop in `mybem-apply` is sequential **on purpose** — `GSLHelper` carries its bracket window across rows ([apply.cpp:49](MyBEM/cpp/src/apps/apply.cpp#L49)).
+
+### Map to `NeuroBEM/code/simulator`
+
+| MyBEM | original |
+|---|---|
+| `apps/apply.cpp` | `simulator_node.cpp` + `simulator.cpp` (the `Simulator` class dissolved into `main`) |
+| `model.cpp` `Model` | `quadcopter.cpp` `Quadcopter` |
+| `types.h:56` `Airframe` | `Quadcopter::_placeMotors` + `Quadcopter_s` in `params.h:144` |
+| `propeller_model.cpp` `add`/`evaluate` | `_calculateThrust`/`_calculateTorque` + `Motor::_update` + `Propeller::_update` (the `Motor` class is gone) |
+| `models/bem.cpp`, `models/simple.h` | the `#if MODEL==1 / ==0 / ==-1` branches of `Propeller::_calculate*` |
+| `gsl_helper.cpp` + `integrands.cpp` | `gslHelper.cpp` (solver split from integrands; `POLAR`/`CHORD` `#if` → fn pointers) |
+| `csv.cpp`, `yaml.cpp` | `csvReader/csvWriter.cpp`, `config.h loadConfig` + `log_params` |
+| `Component::tunables()` | `REGISTRY[21]` at `CMAES.cpp:54` |
+| `apps/tune.cpp` + `tune/cma.cpp` | `CMAES.cpp` (both self-contained CMA-ES; the optimizer is now split out of the driver) |
+| — | `params.h` `#define MODEL/POLAR/CHORD/DIST`, `Propeller_s::field()` reflection, `timeit.h` — all deleted |
+
+**Note:** `MyBEM/store/` is currently **not** in `.gitignore` (only `MyBEM/cpp/build` is), though DESIGN §2.2 says it should be. Don't commit prediction CSVs.
+
+## Architecture: the three-stage pipeline (`NeuroBEM/`, frozen reference)
 
 Data flows through three loosely-coupled stages that communicate via CSV files on disk. There is no single orchestrator — each stage is run manually and writes files the next stage reads.
 
@@ -223,6 +304,7 @@ No CLI build/test harness — scripts are run inside MATLAB. Every function is d
   | C++ simulator ([params.h:169](NeuroBEM/code/simulator/include/params.h#L169), `:164`) | 0.752 | [0.00254, 0.00214, 0.00436] |
   | `CMAES.cpp` + `analysis/utils.py` + `measure_bem_RMSE.py` | 0.772 | [0.00254, 0.00214, 0.00436] |
   | dataset `README.md` / paper / `make_nn_targets.py` / `bem_settings.yaml` | 0.772 | [0.0025, 0.0021, 0.0043] |
+  | **MyBEM** — [configs/drones/paper_quad.yaml](MyBEM/configs/drones/paper_quad.yaml), the only place it is defined | 0.772 | [0.0025, 0.0021, 0.0043] |
 
   So the NN **labels** are computed with the README inertia while the **RMSE reports** use the `params.h` inertia. Small, but it means a number from `measure_bem_RMSE.py` is not bitwise the same quantity as the label the NN fits. Check which a given script uses before comparing.
 - BEM coning/flapping angles use the *linear* lift/drag coefficients (`param.a`/`param.d`); changing the *nonlinear* `param.cl`/`param.cd` will not move those angles. This is intentional (tractability), and it means the CMA-ES retunes never reach the flapping/`kβ` torque path.
