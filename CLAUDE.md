@@ -9,6 +9,8 @@ Also IDE is wrongly configured, so it will report wrong include errors etc. So d
 
 When listing commands to me, one command one line. If there is more than one command or it is super duper complex i will punish you. HARD.
 
+**NO EXTREME RATIONALE COMMENTS. EVER.** Do not write comments that OVERexplain a design choice was made, justify a trade-off, cite a benchmark, reference a spec section, or narrate what the code is doing. I can read the code. Comments explaining intent belong in the commit message or in your reply to me, never in the source. The only comments allowed are: units, non-obvious external constraints (a data format, a hardware quirk), and a one-line file header. If you catch yourself writing "so that", "because", "this means", "note that", or "matches X" in a comment — delete it. Same rule for docstrings: a short one-liner or nothing.
+
 ## My goal, my rules and my story
 
 This repo's goal is to recreate the NeuroBEM paper and port it into the **Agilicious** simulator for closed-loop evaluation. `NeuroBEM/analysis/` is my own workspace to play with and analyze the data and outputs of the BEM model. `agilicious/simulator/` is part of the simulator I received from my supervisor (from the same lab as the paper) that implements BEM inside — the deployment target in the future.
