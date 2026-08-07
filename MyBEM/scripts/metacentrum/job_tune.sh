@@ -1,10 +1,10 @@
 #!/bin/bash
 # PBS job: build mybem-tune on the compute node (-march=native, and MetaCentrum
 # nodes are heterogeneous) and run one CMA-ES fit.
-# submit.py sets: ROOT DATA OUTDIR MODEL DRONE FREE LOSS GENS SEED RUN NCPUS
+# submit_tune.py sets: ROOT DATA OUTDIR MODEL DRONE FREE LOSS GENS SEED RUN NCPUS
 # FREE arrives with '+' instead of ',' because qsub -v is comma-separated.
 
-# submit.py always overrides -l on the qsub command line; these are fallback only.
+# submit_tune.py always overrides -l on the qsub command line; these are fallback only.
 #PBS -N mybem-tune
 #PBS -l select=1:ncpus=12:mem=8gb:scratch_local=4gb
 #PBS -l walltime=4:00:00

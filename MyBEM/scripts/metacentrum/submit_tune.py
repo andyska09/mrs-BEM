@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Submit mybem-tune CMA-ES jobs to MetaCentrum PBS.
 
-Run from anywhere: python3 scripts/metacentrum/submit.py [--free ...] [--loss ...]
 Each (free set, loss) pair becomes one qsub. See metacentrum.md.
 """
 
@@ -12,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-JOB = Path(__file__).resolve().parent / "job.sh"
+JOB = Path(__file__).resolve().parent / "job_tune.sh"
 DEFAULT_DATA = ROOT.parent / "data" / "CMAES-subsets" / "subset_20k.csv"
 DEFAULT_OUT = ROOT / "store" / "tune"
 
