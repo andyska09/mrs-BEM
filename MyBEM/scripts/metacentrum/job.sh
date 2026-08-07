@@ -1,6 +1,6 @@
 #!/bin/bash
 # PBS job for one MyBEM stage. Submit with submit.py, which sets every resource
-# on the qsub line plus STAGE, ROOT, NCPUS and, per stage:
+# on the qsub line plus STAGE, ROOT, CORES and, per stage:
 #   apply  CONFIG DATA
 #   tune   MODEL DRONE DATA FREE LOSS GENS SEED RUN   (FREE uses '+' for ',')
 #   train  EXP SEED [EPOCHS LIMIT]
@@ -9,7 +9,7 @@
 # from ompthreads.
 set -euo pipefail
 
-echo "=== $PBS_JOBID  $STAGE  $(hostname -f)  $NCPUS cores  $(date) ==="
+echo "=== $PBS_JOBID  $STAGE  $(hostname -f)  $CORES cores  $(date) ==="
 
 # Built in the job: the frontend and the compute nodes run different Debian
 # releases. ENABLE_NATIVE stays OFF, see CMakeLists.
@@ -19,7 +19,7 @@ build() {
     cp -r "$ROOT/cpp" "$SCRATCHDIR"/
     rm -rf "$SCRATCHDIR/cpp/build"
     cmake -S "$SCRATCHDIR/cpp" -B "$SCRATCHDIR/build" >/dev/null
-    cmake --build "$SCRATCHDIR/build" --target "$1" -j "$NCPUS"
+    cmake --build "$SCRATCHDIR/build" --target "$1" -j "$CORES"
 }
 
 case "$STAGE" in

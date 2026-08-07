@@ -8,8 +8,11 @@
 | `tune` | 32 CPUs, 8 GB, 4 h | `mybem-tune` splits the CMA-ES fitness across samples |
 | `train` | 4 CPUs, 1 GPU (10 GB), 16 GB, 8 h, queue `gpu` | `--device cuda` |
 
-`apply`/`tune` build the C++ binary inside the job (`-march=native`, heterogeneous
-nodes) in `$SCRATCHDIR`. Everything else reads and writes shared home directly, so
+`apply`/`tune` build the C++ binary inside the job in `$SCRATCHDIR`, because the
+frontends and the compute nodes run different Debian releases. **`-march=native`
+is off** — with gcc 9.2 and Eigen 3.3.7 on the znver2 nodes it corrupts the heap
+and `mybem-tune` aborts with `double free or corruption (out)`; it was worth ~10%.
+Everything else reads and writes shared home directly, so
 there is no copy-back step and `apply` resumes — it skips segments that already
 have an output. Both binaries take their thread count from `OMP_NUM_THREADS`,
 which PBS sets from `ompthreads`.

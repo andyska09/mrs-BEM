@@ -48,7 +48,7 @@ def select(a):
 
 
 def submit(a, name, env):
-    env = {"STAGE": a.stage, "ROOT": ROOT, "NCPUS": a.ncpus, **env}
+    env = {"STAGE": a.stage, "ROOT": ROOT, "CORES": a.ncpus, **env}
     cmd = ["qsub", "-N", name]
     if a.stage == "train":
         cmd += ["-q", "gpu"]
