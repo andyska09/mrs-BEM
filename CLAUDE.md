@@ -72,7 +72,7 @@ Two type aliases are the whole trick that killed the `#define`s ([types.h:13-15]
 
 ### Commands
 
-Build (needs GSL + Eigen + OpenMP; on macOS the CMakeLists auto-points at `brew --prefix libomp` since AppleClang ships no runtime, and a missing OpenMP is a **fatal error** unless you pass `-DENABLE_PARALLEL=OFF`. Options: `ENABLE_FAST`, `UNSAFE_MATH`, `ENABLE_PARALLEL`, `ENABLE_NATIVE`, `EIGEN_FROM_SYSTEM`/`EIGEN_ALTERNATIVE`, all ON by default):
+Build (needs GSL + Eigen + OpenMP; on macOS the CMakeLists auto-points at `brew --prefix libomp` since AppleClang ships no runtime, and a missing OpenMP is a **fatal error** unless you pass `-DENABLE_PARALLEL=OFF`. Options: `ENABLE_FAST`, `UNSAFE_MATH`, `ENABLE_PARALLEL`, `EIGEN_FROM_SYSTEM`/`EIGEN_ALTERNATIVE` ON by default; **`ENABLE_NATIVE` OFF** — `-march=native` under gcc 9.2 + Eigen 3.3.7 on MetaCentrum's znver2 nodes corrupts the heap and aborts `mybem-tune` with `double free or corruption (out)`, for ~10% speed):
 ```
 cmake -S MyBEM/cpp -B MyBEM/cpp/build && cmake --build MyBEM/cpp/build
 ```

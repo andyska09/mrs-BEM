@@ -11,7 +11,8 @@ set -euo pipefail
 
 echo "=== $PBS_JOBID  $STAGE  $(hostname -f)  $NCPUS cores  $(date) ==="
 
-# -march=native on heterogeneous nodes: the binary has to be built in the job.
+# Built in the job: the frontend and the compute nodes run different Debian
+# releases. ENABLE_NATIVE stays OFF, see CMakeLists.
 build() {
     trap 'clean_scratch' TERM EXIT
     module add cmake gcc gsl eigen

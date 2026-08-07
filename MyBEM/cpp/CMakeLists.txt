@@ -4,7 +4,9 @@ project(mybem CXX)
 option(ENABLE_FAST "Build with optimizations for speed" ON)
 option(UNSAFE_MATH "Build with -funsafe-math-optimizations" ON)
 option(ENABLE_PARALLEL "Build using OpenMP parallelization" ON)
-option(ENABLE_NATIVE "Build with -march=native" ON)
+# OFF: gcc 9.2 + Eigen 3.3.7 + -march=native (znver2) corrupts the heap in
+# mybem-tune on MetaCentrum. Worth ~10%.
+option(ENABLE_NATIVE "Build with -march=native" OFF)
 option(EIGEN_FROM_SYSTEM "Use the system-provided Eigen" ON)
 set(EIGEN_ALTERNATIVE "" CACHE STRING "Path to an alternative Eigen include dir")
 

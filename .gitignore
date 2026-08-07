@@ -1,6 +1,6 @@
 .DS_Store
 
-MyBEM/cpp/build
+MyBEM/cpp/build*
 MyBEM/store
 MyBEM/logs
 /data/
