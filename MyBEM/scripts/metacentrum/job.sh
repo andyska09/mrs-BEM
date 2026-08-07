@@ -3,7 +3,7 @@
 # on the qsub line plus STAGE, ROOT, NCPUS and, per stage:
 #   apply  CONFIG DATA
 #   tune   MODEL DRONE DATA FREE LOSS GENS SEED RUN   (FREE uses '+' for ',')
-#   train  EXP SEED
+#   train  EXP SEED [EPOCHS LIMIT]
 # Results go straight into $ROOT/store; scratch is only used for the build.
 # The C++ binaries take their thread count from OMP_NUM_THREADS, which PBS sets
 # from ompthreads.
@@ -37,7 +37,8 @@ train)
     cd "$ROOT"
     conda activate "$PBS_O_HOME/.conda/envs/mybem"
     nvidia-smi -L
-    python -m mybem.train "configs/experiments/$EXP" --seed "$SEED" --device cuda
+    python -m mybem.train "configs/experiments/$EXP" --seed "$SEED" --device cuda \
+        ${EPOCHS:+--epochs "$EPOCHS"} ${LIMIT:+--limit "$LIMIT"}
     ;;
 esac
 

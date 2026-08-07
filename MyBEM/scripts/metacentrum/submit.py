@@ -32,7 +32,12 @@ def jobs(a):
     else:
         for e in a.exp:
             for s in a.seeds:
-                yield f"train_{Path(e).stem}_s{s}", {"EXP": e, "SEED": s}
+                env = {"EXP": e, "SEED": s}
+                if a.epochs:
+                    env["EPOCHS"] = a.epochs
+                if a.limit:
+                    env["LIMIT"] = a.limit
+                yield f"train_{Path(e).stem}_s{s}", env
 
 
 def select(a):
@@ -92,6 +97,8 @@ def main():
     rp.add_argument("--exp", nargs="+", default=["tcn_baseline.yaml"],
                     help="experiment yaml(s) under configs/experiments/")
     rp.add_argument("--seeds", nargs="+", type=int, default=[0])
+    rp.add_argument("--epochs", type=int, help="override the experiment yaml")
+    rp.add_argument("--limit", type=int, help="first N segments per fold")
     rp.add_argument("--gpu-mem", default="10gb", dest="gpu_mem")
     common(rp, 4, "16gb", "8:00:00")
 
