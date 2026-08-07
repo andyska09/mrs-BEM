@@ -6,9 +6,9 @@ Each (free set, loss) pair becomes one qsub. See metacentrum.md.
 """
 
 import argparse
+import hashlib
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,9 +17,16 @@ DEFAULT_DATA = ROOT.parent / "data" / "CMAES-subsets" / "subset_20k.csv"
 DEFAULT_OUT = ROOT / "store" / "tune"
 
 
-def submit(free, loss, args, stamp):
+def run_name(free, loss, args):
+    """<loss>_<n>p@<hash6> over everything that defines the fit."""
+    key = "|".join([args.model, args.drone, args.data.name, free, loss,
+                    str(args.gens), str(args.seed)])
     n = "all" if free == "all" else f"{len(free.split(','))}p"
-    run = f"{stamp}_{loss}_{n}"
+    return f"{loss}_{n}@{hashlib.sha256(key.encode()).hexdigest()[:6]}"
+
+
+def submit(free, loss, args):
+    run = run_name(free, loss, args)
     qsub_vars = [
         f"ROOT={ROOT}", f"DATA={args.data}", f"OUTDIR={args.outdir}",
         f"MODEL={args.model}", f"DRONE={args.drone}",
@@ -29,7 +36,7 @@ def submit(free, loss, args, stamp):
     ]
     cmd = [
         "qsub",
-        "-N", f"tune_{loss}_{n}",
+        "-N", f"tune_{run}",
         "-l", f"select=1:ncpus={args.ncpus}:ompthreads={args.ncpus}"
               f":mem={args.mem}:scratch_local=4gb",
         "-l", f"walltime={args.walltime}",
@@ -74,12 +81,11 @@ def main():
             sys.exit(f"config not found: configs/{sub}/{f}")
     Path("logs").mkdir(exist_ok=True)
 
-    stamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     jobs = [(f, l) for f in args.free for l in args.loss]
     print(f"Submitting {len(jobs)} job(s)...")
     for free, loss in jobs:
         print(f"\n[free={free} loss={loss}]")
-        submit(free, loss, args, stamp)
+        submit(free, loss, args)
 
 
 if __name__ == "__main__":

@@ -349,6 +349,16 @@ namespace
         return out;
     }
 
+    std::string baseName(const std::string &path)
+    {
+        const size_t end = path.find_last_not_of('/');
+        if (end == std::string::npos)
+            return path;
+        const size_t slash = path.find_last_of('/', end);
+        return path.substr(slash == std::string::npos ? 0 : slash + 1,
+                           end - (slash == std::string::npos ? -1 : slash));
+    }
+
     void writeMetrics(const std::string &path, const std::array<double, 6> &base,
                       const std::array<double, 6> &best)
     {
@@ -514,6 +524,7 @@ int main(int argc, char **argv)
     printRmse(best_metrics);
 
     fleet[0].set(best);
+    fleet[0].setName(baseName(args.out));
     fleet[0].save(args.out + "/model.yaml");
     writeMetrics(args.out + "/metrics.csv", base_metrics, best_metrics);
     writeRunRecord(args.out + "/tune.yaml", args, drone, free, threads, base_loss,

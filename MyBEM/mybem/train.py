@@ -1,6 +1,8 @@
 """Train a network on base-model residuals."""
 
 import argparse
+import hashlib
+import json
 import math
 import time
 
@@ -54,13 +56,11 @@ def normalize(data, norm, device):
             (t(data.label) - t(norm["means_out"])) / t(norm["stds_out"]))
 
 
-def run(exp_path, seed=None, name=None, limit=None, epochs=None):
+def run(exp_path, seed=None, limit=None, epochs=None):
     with open(exp_path) as f:
         cfg = yaml.safe_load(f)
     if seed is not None:
         cfg["seed"] = seed
-    if name is not None:
-        cfg["name"] = name
     if epochs is not None:
         cfg["optim"]["epochs"] = epochs
     history, cut = cfg["history"], cfg["max_speed"]
@@ -81,10 +81,12 @@ def run(exp_path, seed=None, name=None, limit=None, epochs=None):
     tw, vw = train.windows(history, cut), val.windows(history, cut)
     print(f"rows {len(train.feat)}/{len(val.feat)}   windows {len(tw)}/{len(vw)}")
 
-    out = NETS / cfg["name"]
+    saved = {**cfg, "segments": folds}
+    h = hashlib.sha256(json.dumps(saved, sort_keys=True).encode()).hexdigest()[:6]
+    out = NETS / f"{cfg['name']}@{h}"
     (out / "tb").mkdir(parents=True, exist_ok=True)
     with open(out / "config.yaml", "w") as f:
-        yaml.safe_dump({**cfg, "segments": folds}, f, sort_keys=False)
+        yaml.safe_dump(saved, f, sort_keys=False)
     with open(out / "normalization.yaml", "w") as f:
         yaml.safe_dump({"history": history, "features": cfg["features"],
                         "mass": drone.mass, "inertia": drone.inertia.tolist(),
@@ -160,11 +162,10 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("experiment")
     p.add_argument("--seed", type=int)
-    p.add_argument("--name")
     p.add_argument("--limit", type=int, help="use only the first N segments per fold")
     p.add_argument("--epochs", type=int)
     a = p.parse_args()
-    run(a.experiment, a.seed, a.name, a.limit, a.epochs)
+    run(a.experiment, a.seed, a.limit, a.epochs)
 
 
 if __name__ == "__main__":

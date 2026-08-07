@@ -18,6 +18,7 @@ class Model {
   void set(const Params& overrides);
 
   const std::string& name() const { return name_; }
+  void setName(const std::string& name) { name_ = name; }
   const std::string& drone() const { return drone_; }
   size_t size() const { return components_.size(); }
 
