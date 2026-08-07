@@ -6,10 +6,10 @@ seed: 0
 
 history: 20
 features: [angvel, linvel, motors]
-max_speed: 0          # 0 = off; else drop windows whose span exceeds this body speed
+max_speed: 0          
 batch_size: 128
-device: cpu           # cpu | mps | cuda; mps loses at this size, it is launch-bound
-threads: 1            # torch threads; >1 is slower for a model this small
+device: cpu           # cpu | mps | cuda; mps 
+threads: 1            
 
 net: {arch: tcn, kernels: [7, 5], filters: [32, 32], neurons: [20], two_heads: true}
 
