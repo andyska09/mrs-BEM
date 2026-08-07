@@ -2,6 +2,7 @@
 
 MyBEM/cpp/build
 MyBEM/store
+MyBEM/logs
 /data/
 
 **/__pycache__/

@@ -51,7 +51,7 @@ This repo is a workspace of four loosely-coupled parts:
 
 A clean-break reimplementation of the pipeline. `NeuroBEM/` stays frozen as the paper reference and the fallback/cross-check; nothing is imported from it except the merged flight CSVs. **[MyBEM/DESIGN.md](MyBEM/DESIGN.md) is the spec** — §1 (four artifact kinds), §5 (CLI), §6 (C++ architecture), §10 (decisions/non-goals). §10 "OPEN" is empty: the spec is settled, don't relitigate it.
 
-**What exists today: both halves.** C++ — two binaries (`mybem-apply`, `mybem-tune`) + the `mybem_sim` library, ~1500 lines under [MyBEM/cpp/](MyBEM/cpp/). Python — the `mybem/` package (~575 lines, **PyTorch**, not TF): [drone.py](MyBEM/mybem/drone.py), [data.py](MyBEM/mybem/data.py), [train.py](MyBEM/mybem/train.py), [eval.py](MyBEM/mybem/eval.py), [nets/](MyBEM/mybem/nets/). Still **not written**: the single `mybem` CLI of DESIGN §5 (run modules directly, `python -m mybem.train`), the `@hash6` in the `store/<kind>/<name>@<hash6>/` artifact layout of DESIGN §2.2 (dirs are flat `store/nets/<name>/`, `store/preds/<name>/`, `store/tune/<name>/`), and the sweep/run-table of §4.6/§7.7. `Component::diagnose()`/`diagnostics()` ([component.h:21-22](MyBEM/cpp/include/mybem/component.h#L21)) are declared and never called. **`MyBEM/DESIGN.md` is still untracked** (`??` in git status).
+**What exists today: both halves.** C++ — two binaries (`mybem-apply`, `mybem-tune`) + the `mybem_sim` library, ~1500 lines under [MyBEM/cpp/](MyBEM/cpp/). Python — the `mybem/` package (~575 lines, **PyTorch**, not TF): [drone.py](MyBEM/mybem/drone.py), [data.py](MyBEM/mybem/data.py), [train.py](MyBEM/mybem/train.py), [eval.py](MyBEM/mybem/eval.py), [nets/](MyBEM/mybem/nets/). Still **not written**: the single `mybem` CLI of DESIGN §5 (run modules directly, `python -m mybem.train`) and the sweep/run-table of §4.6/§7.7. The `@hash6` of DESIGN §2.2 exists for nets ([train.py:85-86](MyBEM/mybem/train.py#L85)) and for cluster tune runs ([submit.py:23-26](MyBEM/scripts/metacentrum/submit.py#L23)); `store/preds/<name>/` is still flat, since a PREDS folder is named by the model's `name:` field. `Component::diagnose()`/`diagnostics()` ([component.h:21-22](MyBEM/cpp/include/mybem/component.h#L21)) are declared and never called. **`MyBEM/DESIGN.md` is still untracked** (`??` in git status).
 
 ### The object model
 
@@ -76,13 +76,9 @@ Build (needs GSL + Eigen + OpenMP; on macOS the CMakeLists auto-points at `brew 
 ```
 cmake -S MyBEM/cpp -B MyBEM/cpp/build && cmake --build MyBEM/cpp/build
 ```
-Apply a model to one segment (7-col output + `params.yaml` written next to it):
+Apply a model (`MODEL.yaml INPUT PREDSDIR`; INPUT is one `merged_*_seg_*.csv` or a folder of them, output goes to `PREDSDIR/<name from the config>/<id>.csv` + `params.yaml`, existing outputs are skipped so re-running resumes, `OMP_NUM_THREADS` segments at a time):
 ```
-MyBEM/cpp/build/mybem-apply configs/models/bem_default.yaml INPUT.csv OUTPUT.csv
-```
-Batch every segment in a folder ([scripts/apply.sh](MyBEM/scripts/apply.sh) `BASEPATH MODEL CONFIG [filelist]` → `MyBEM/store/preds/MODEL/<id>.csv`; existing outputs are skipped, so it is safe to re-run):
-```
-MyBEM/scripts/apply.sh data/processed_data bem_default MyBEM/configs/models/bem_default.yaml
+MyBEM/cpp/build/mybem-apply MyBEM/configs/models/bem_default.yaml data/processed_data MyBEM/store/preds
 ```
 List a model's tunable names, report RMSE at the loaded values, and fit ([tune.cpp:320](MyBEM/cpp/src/apps/tune.cpp#L320)):
 ```
@@ -92,9 +88,23 @@ MyBEM/cpp/build/mybem-tune MODEL.yaml DATA.csv --drone configs/drones/paper_quad
 ```
 `--free NAMES|all` replaces the old `--cma MASK` bit string; a bare name is accepted when exactly one component offers it, otherwise write `bem.lift_coefficient` ([tune.cpp:263](MyBEM/cpp/src/apps/tune.cpp#L263)). `--free` requires `--out`, `--drone` is always required. Other flags: `--gens` (100), `--seed` (0), `--threads`, `--loss force|torque|both` (**default `force`**, [tune.cpp:237](MyBEM/cpp/src/apps/tune.cpp#L237)). Output dir gets `model.yaml` (a full config — feed it straight back to `mybem-apply` or resume a tune from it), `convergence.csv`, `metrics.csv` (baseline + best rows), `tune.yaml` (run record).
 
+### MetaCentrum
+
+All three stages run as PBS jobs from **one** `submit.py` + **one** `job.sh` under [MyBEM/scripts/metacentrum/](MyBEM/scripts/metacentrum/); [metacentrum.md](MyBEM/scripts/metacentrum/metacentrum.md) is the guide. Every list argument multiplies out into separate jobs. `apply`/`tune` build the binary inside the job in `$SCRATCHDIR` (`-march=native`, heterogeneous nodes) and get `ncpus=ompthreads=32`; `train` gets `-q gpu`, `ngpus=1`, and `--device cuda`. Everything writes straight to `MyBEM/store/` on shared home — no copy-back, and `apply` skips finished segments so a killed job resumes.
+```
+python3 scripts/metacentrum/submit.py apply --config configs/models/bem_default.yaml
+```
+```
+python3 scripts/metacentrum/submit.py tune --free all --loss force both
+```
+```
+python3 scripts/metacentrum/submit.py train --exp tcn_baseline.yaml --seeds 0 1 2
+```
+Add `--dry-run` to print the `qsub` lines without submitting. Resources are overridable per submit: `--ncpus --mem --walltime` (`--gpu-mem` for `train`).
+
 ### mybem-apply / mybem-tune I/O
 
-Both read a `merged_*_seg_X.csv` (≥29 cols, header, FLU) and take exactly the slices they need — `mybem-apply` reads angvel@4, linvel@14, motors@20, motor-accel@24 plus col 0 ([apply.cpp:13-17](MyBEM/cpp/src/apps/apply.cpp#L13)); `mybem-tune` additionally reads angacc@1 and acc@11 to build the measured wrench ([tune.cpp:28-34](MyBEM/cpp/src/apps/tune.cpp#L28)). Position and attitude are never read, because no component uses them. Internals are **FRD**; `flu2frd`/`frd2flu` convert at the boundary. Output is 7 columns, no header, `%.12g`: `t, fx, fy, fz, tx, ty, tz` (FLU).
+Both read a `merged_*_seg_X.csv` (≥29 cols, header, FLU) and take exactly the slices they need — `mybem-apply` reads angvel@4, linvel@14, motors@20, motor-accel@24 plus col 0 ([apply.cpp:21-25](MyBEM/cpp/src/apps/apply.cpp#L21)); `mybem-tune` additionally reads angacc@1 and acc@11 to build the measured wrench ([tune.cpp:28-34](MyBEM/cpp/src/apps/tune.cpp#L28)). Position and attitude are never read, because no component uses them. Internals are **FRD**; `flu2frd`/`frd2flu` convert at the boundary. Output is 7 columns, no header, `%.12g`: `t, fx, fy, fz, tx, ty, tz` (FLU).
 
 CMA-ES is a from-scratch (mu/mu_w, lambda) implementation ([cma.cpp](MyBEM/cpp/src/tune/cma.cpp)) that knows nothing about the objective — bounds and scaling live in `SearchSpace` ([tune.cpp:147](MyBEM/cpp/src/apps/tune.cpp#L147)), which centres x-space on the **loaded model's current values**, not the hardcoded defaults, so a tune resumes from its own output. Loss is per-term MSE normalized by the baseline MSE, so the starting objective is exactly 1 per active term ([tune.cpp:386](MyBEM/cpp/src/apps/tune.cpp#L386)).
 
@@ -106,7 +116,7 @@ CMA-ES is a from-scratch (mu/mu_w, lambda) implementation ([cma.cpp](MyBEM/cpp/s
 - **`motor_reaction` can actually fire.** The original read `domega` but never called `setMotorAcceleration`, so the term was dead; `apply.cpp:56` fills `s.dmot` for real. It is absent from `bem_default.yaml`, so the default stays faithful — add it and you get a term the old pipeline never had.
 - **`body_drag` is opt-in**; the old code had no off switch.
 - **No caching.** The `_valid`/`_validv1` dirty flags are gone; every `evaluate` recomputes.
-- **Parallelism moved.** The rotor loop is `omp parallel for` ([propeller_model.cpp:26](MyBEM/cpp/src/models/propeller_model.cpp#L26)); `mybem-tune` parallelizes across *samples* with one `Model` per thread and `omp_set_max_active_levels(1)`, which collapses the inner rotor loop to serial ([tune.cpp:354](MyBEM/cpp/src/apps/tune.cpp#L354)). The row loop in `mybem-apply` is sequential **on purpose** — `GSLHelper` carries its bracket window across rows ([apply.cpp:49](MyBEM/cpp/src/apps/apply.cpp#L49)).
+- **Parallelism moved.** The rotor loop is `omp parallel for` ([propeller_model.cpp:26](MyBEM/cpp/src/models/propeller_model.cpp#L26)), but both apps parallelize a level above it with one `Model` per thread and `omp_set_max_active_levels(1)`, which collapses that rotor loop to serial: `mybem-tune` across *samples* ([tune.cpp:354](MyBEM/cpp/src/apps/tune.cpp#L354)), `mybem-apply` across *segments* ([apply.cpp:125](MyBEM/cpp/src/apps/apply.cpp#L125)). Inside one segment the row loop stays sequential **on purpose** — `GSLHelper` carries its bracket window across rows ([apply.cpp:62](MyBEM/cpp/src/apps/apply.cpp#L62)).
 
 ### The Python half (`MyBEM/mybem/`, PyTorch)
 

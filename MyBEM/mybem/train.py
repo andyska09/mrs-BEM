@@ -56,13 +56,15 @@ def normalize(data, norm, device):
             (t(data.label) - t(norm["means_out"])) / t(norm["stds_out"]))
 
 
-def run(exp_path, seed=None, limit=None, epochs=None):
+def run(exp_path, seed=None, limit=None, epochs=None, device=None):
     with open(exp_path) as f:
         cfg = yaml.safe_load(f)
     if seed is not None:
         cfg["seed"] = seed
     if epochs is not None:
         cfg["optim"]["epochs"] = epochs
+    if device is not None:
+        cfg["device"] = device
     history, cut = cfg["history"], cfg["max_speed"]
     device = torch.device(cfg["device"])
     # The model is ~28k params; multithreading tiny ops costs more than it saves.
@@ -73,6 +75,7 @@ def run(exp_path, seed=None, limit=None, epochs=None):
     if limit:
         folds = {k: v[:limit] for k, v in folds.items()}
     print(f"{cfg['name']}  preds={cfg['preds']}  split={cfg['split']}  "
+          f"device={device}  "
           f"train/val/test = {len(folds['train'])}/{len(folds['val'])}/{len(folds['test'])}")
 
     train = Data(cfg["preds"], folds["train"], cfg["features"], drone)
@@ -164,8 +167,9 @@ def main():
     p.add_argument("--seed", type=int)
     p.add_argument("--limit", type=int, help="use only the first N segments per fold")
     p.add_argument("--epochs", type=int)
+    p.add_argument("--device", choices=["cpu", "cuda", "mps"])
     a = p.parse_args()
-    run(a.experiment, a.seed, a.limit, a.epochs)
+    run(a.experiment, a.seed, a.limit, a.epochs, a.device)
 
 
 if __name__ == "__main__":
