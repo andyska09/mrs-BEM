@@ -11,11 +11,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 JOB = Path(__file__).resolve().parent / "job_train.sh"
-DEFAULT_VENV = Path.home() / "mybem-venv"
-
 
 def submit(exp, seed, args):
-    qsub_vars = [f"ROOT={ROOT}", f"VENV={args.venv}", f"EXP={exp}", f"SEED={seed}"]
+    qsub_vars = [f"ROOT={ROOT}", f"EXP={exp}", f"SEED={seed}"]
     cmd = [
         "qsub",
         "-N", f"train_{Path(exp).stem}_s{seed}",
@@ -41,7 +39,6 @@ def main():
     p.add_argument("--exp", nargs="+", default=["tcn_baseline.yaml"],
                    help="experiment yaml(s) under configs/experiments/")
     p.add_argument("--seeds", nargs="+", type=int, default=[0])
-    p.add_argument("--venv", type=Path, default=DEFAULT_VENV)
     p.add_argument("--ncpus", type=int, default=2,
                    help="torch runs single-threaded; 2 covers the loader")
     p.add_argument("--mem", default="8gb")

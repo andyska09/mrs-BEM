@@ -1,7 +1,7 @@
 #!/bin/bash
-# PBS job: train one network. No build and no scratch — the venv and the data
-# live on shared home, and mybem.train writes straight into store/nets/.
-# submit_train.py sets: ROOT VENV EXP SEED
+# PBS job: train one network. No build and no scratch — the env and the data live
+# on shared home, and mybem.train writes straight into store/nets/.
+# submit_train.py sets: ROOT EXP SEED
 
 #PBS -N mybem-train
 #PBS -l select=1:ncpus=2:mem=8gb
@@ -16,8 +16,9 @@ echo "Exp:  $EXP   Seed: $SEED"
 echo "Started: $(date)"
 echo "============================="
 
-source "$VENV/bin/activate"
 cd "$ROOT"
+conda activate "$PBS_O_HOME/.conda/envs/mybem"
+
 python -m mybem.train "configs/experiments/$EXP" --seed "$SEED"
 
 echo "============================="
