@@ -42,8 +42,8 @@ def jobs(a):
 
 def select(a):
     if a.stage == "train":
-        return (f"select=1:ncpus={a.ncpus}:ngpus=1:gpu_mem={a.gpu_mem}"
-                f":gpu_cap={a.gpu_cap}:mem={a.mem}")
+        return (f"select=1:ncpus={a.ncpus}:ngpus=1:gpu_mem={a.gpu_mem}:mem={a.mem}"
+                + (f":gpu_cap={a.gpu_cap}" if a.gpu_cap else ""))
     return (f"select=1:ncpus={a.ncpus}:ompthreads={a.ncpus}"
             f":mem={a.mem}:scratch_local=4gb")
 
