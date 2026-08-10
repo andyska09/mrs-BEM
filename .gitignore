@@ -6,3 +6,6 @@ MyBEM/logs
 /data/
 
 **/__pycache__/
+
+#pdfs source of papers
+*.pdf
