@@ -3,10 +3,13 @@
 Contract: (batch, history, features) -> (batch, 6), residual force then torque.
 """
 
+from .dtcn import DTCN
+from .linear import Linear
+from .lstm import LSTM
 from .mlp import MLP
 from .tcn import TCN
 
-ARCHITECTURES = {"tcn": TCN, "mlp": MLP}
+ARCHITECTURES = {"tcn": TCN, "mlp": MLP, "dtcn": DTCN, "lstm": LSTM, "linear": Linear}
 
 
 def create_net(cfg, history, feature_dim):

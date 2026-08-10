@@ -27,7 +27,7 @@ def table(force, torque):
     return rmse(force) + rmse(torque)
 
 
-def run(name, fold="test"):
+def run(name, fold="test", verbose=True):
     out = NETS / name
     with open(out / "config.yaml") as f:
         cfg = yaml.safe_load(f)
@@ -60,15 +60,16 @@ def run(name, fold="test"):
     label = data.label[starts + history - 1].astype(float)
     left = label - pred
 
-    print(f"\n{name} on {fold}: {len(ids)} segments, {len(starts)} windows "
-          f"(best epoch {ckpt['epoch'] + 1}, val loss {ckpt['val_loss']:.4f})\n")
     every = data.label.astype(float)
     rows = {"BEM": table(every[:, :3], every[:, 3:]),
             "BEM+NN": table(left[:, :3], left[:, 3:])}
-    print(f"{'':12}{'Fxy':>7} {'Fz':>7} {'F':>7}   {'Mxy':>8} {'Mz':>8} {'M':>8}")
-    for k, v in list(rows.items()) + [(f"paper {k}", v) for k, v in PAPER.items()]:
-        print(f"{k:12}{v[0]:7.3f} {v[1]:7.3f} {v[2]:7.3f}   "
-              f"{v[3]:8.4f} {v[4]:8.4f} {v[5]:8.4f}")
+    if verbose:
+        print(f"\n{name} on {fold}: {len(ids)} segments, {len(starts)} windows "
+              f"(best epoch {ckpt['epoch'] + 1}, val loss {ckpt['val_loss']:.4f})\n")
+        print(f"{'':12}{'Fxy':>7} {'Fz':>7} {'F':>7}   {'Mxy':>8} {'Mz':>8} {'M':>8}")
+        for k, v in list(rows.items()) + [(f"paper {k}", v) for k, v in PAPER.items()]:
+            print(f"{k:12}{v[0]:7.3f} {v[1]:7.3f} {v[2]:7.3f}   "
+                  f"{v[3]:8.4f} {v[4]:8.4f} {v[5]:8.4f}")
     return rows
 
 
