@@ -9,6 +9,14 @@ Also IDE is wrongly configured, so it will report wrong include errors etc. So d
 
 When listing commands to me, one command one line. If there is more than one command or it is super duper complex i will punish you. HARD.
 
+**DO WHAT I ASKED. NOTHING ELSE.** Touch only the files the current request is about. If you spot something else worth changing — a duplication, a bug, a better place for the code — **say it in one line and wait.** Do not "fix" it. A file I did not name is off limits, and noticing a problem is not permission to solve it.
+
+**WHEN I ASK A QUESTION, ANSWER THE QUESTION.** A question is not a task. If I ask "why did you say X", the reply is a sentence explaining why — not a tool call, not a rewrite, not a demonstration. Do not treat a question as a complaint and do not treat a complaint as a work order. If you think I am wrong, say so and stop; I will decide.
+
+**RESPECT A STOP.** "stop", "revert", "no", "wait" means stop immediately at the current tool call. Do not finish the thought, do not clean up first, do not squeeze in one more edit. Report what state things are in and wait.
+
+**READ THE LENGTH SIGNALS.** If I say it is too long, the next answer is shorter — not a shorter preamble followed by the same wall of text. When I say "I was just asking", the answer is one or two sentences.
+
 **NO EXTREME RATIONALE COMMENTS. EVER.** Do not write comments that OVERexplain a design choice was made, justify a trade-off, cite a benchmark, reference a spec section, or narrate what the code is doing. I can read the code. Comments explaining intent belong in the commit message or in your reply to me, never in the source. The only comments allowed are: units, non-obvious external constraints (a data format, a hardware quirk), and a one-line file header. If you catch yourself writing "so that", "because", "this means", "note that", or "matches X" in a comment — delete it. Same rule for docstrings: a short one-liner or nothing.
 
 ## My goal, my rules and my story
