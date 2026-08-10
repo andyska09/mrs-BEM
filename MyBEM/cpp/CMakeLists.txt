@@ -67,6 +67,7 @@ add_library(mybem_sim
         src/models/bem.cpp
         src/models/body_drag.cpp
         src/models/motor_reaction.cpp
+        src/models/polyfit.cpp
         src/bem/gsl_helper.cpp
         src/bem/integrands.cpp
         src/bem/coning.cpp

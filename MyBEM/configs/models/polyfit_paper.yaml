@@ -1,0 +1,14 @@
+name: polyfit_paper
+drone: paper_quad
+models:
+  - type: polyfit
+    radius: 0.06477
+    air_density: 1.204
+    ct_hover: 0.021873402837883825
+    ref_length: 0.12682271089990152
+    coeffs: MyBEM/store/polyfit/polyfit_paper/coeffs.txt
+airframe:
+  thrust_scale: 1
+  dx: 0.078
+  dy: 0.1
+  dz: 0.027
