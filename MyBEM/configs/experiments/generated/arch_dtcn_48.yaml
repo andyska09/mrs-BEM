@@ -1,0 +1,45 @@
+name: arch_dtcn_48
+preds: bem_default
+drone: paper_quad
+split: paper
+seed: 0
+history: 20
+features:
+- angvel
+- linvel
+- motors
+max_speed: 0
+batch_size: 128
+device: cpu
+threads: 1
+net:
+  arch: dtcn
+  channels: 48
+  dilations:
+  - 1
+  - 2
+  - 2
+  kernel: 3
+  neurons:
+  - 20
+  two_heads: true
+loss:
+  weight_force: 1.0
+  weight_torque: 1.0
+  axis_weight_force:
+  - 1.0
+  - 1.0
+  - 3.0
+  axis_weight_torque:
+  - 1.0
+  - 1.0
+  - 1.0
+optim:
+  epochs: 120
+  lr: 0.001
+  l2: 0.0
+  scheduler:
+    first_decay_steps: 10000
+    t_mul: 1.5
+    m_mul: 0.75
+    alpha: 0.01
