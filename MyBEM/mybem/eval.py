@@ -27,14 +27,14 @@ def table(force, torque):
     return rmse(force) + rmse(torque)
 
 
-def run(name, fold="test", verbose=True):
+def run(name, fold="test", verbose=True, device=None):
     out = NETS / name
     with open(out / "config.yaml") as f:
         cfg = yaml.safe_load(f)
     with open(out / "normalization.yaml") as f:
         norm = yaml.safe_load(f)
     history = cfg["history"]
-    device = torch.device(cfg["device"])
+    device = torch.device(device or cfg["device"])
     torch.set_num_threads(cfg["threads"])
 
     ids = cfg["segments"][fold] if "segments" in cfg else split(cfg["split"], segment_ids())[fold]
@@ -77,8 +77,9 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("net")
     p.add_argument("--on", default="test", choices=["train", "val", "test"])
+    p.add_argument("--device", choices=["cpu", "cuda", "mps"])
     a = p.parse_args()
-    run(a.net, a.on)
+    run(a.net, a.on, device=a.device)
 
 
 if __name__ == "__main__":

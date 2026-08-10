@@ -34,6 +34,7 @@ def main():
     p.add_argument("--on", default="test", choices=["train", "val", "test"])
     p.add_argument("--match", default="", help="substring filter on the experiment name")
     p.add_argument("--quick", action="store_true", help="val loss only, skip evaluation")
+    p.add_argument("--device", choices=["cpu", "cuda", "mps"])
     a = p.parse_args()
 
     groups = collect(a.match)
@@ -50,7 +51,7 @@ def main():
         params, val = zip(*[stats(d) for d in dirs])
         print(f"{name:22}{len(dirs):>2} {params[0]:>8} {np.mean(val):>8.4f}", end="")
         if not a.quick:
-            rows = [run(d.name, a.on, verbose=False) for d in dirs]
+            rows = [run(d.name, a.on, verbose=False, device=a.device) for d in dirs]
             bem = rows[0]["BEM"]
             v = np.array([r["BEM+NN"] for r in rows])
             m, s = v.mean(0), v.std(0)
