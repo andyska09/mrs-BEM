@@ -42,7 +42,8 @@ def jobs(a):
 
 def select(a):
     if a.stage == "train":
-        return f"select=1:ncpus={a.ncpus}:ngpus=1:gpu_mem={a.gpu_mem}:mem={a.mem}"
+        return (f"select=1:ncpus={a.ncpus}:ngpus=1:gpu_mem={a.gpu_mem}"
+                f":gpu_cap={a.gpu_cap}:mem={a.mem}")
     return (f"select=1:ncpus={a.ncpus}:ompthreads={a.ncpus}"
             f":mem={a.mem}:scratch_local=4gb")
 
@@ -102,6 +103,8 @@ def main():
     rp.add_argument("--epochs", type=int, help="override the experiment yaml")
     rp.add_argument("--limit", type=int, help="first N segments per fold")
     rp.add_argument("--gpu-mem", default="10gb", dest="gpu_mem")
+    # compute_75 and above; the cu130 torch wheel ships no kernels below sm_75.
+    rp.add_argument("--gpu-cap", default="compute_75", dest="gpu_cap")
     common(rp, 4, "16gb", "8:00:00")
 
     a = p.parse_args()
