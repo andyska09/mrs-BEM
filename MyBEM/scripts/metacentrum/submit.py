@@ -96,6 +96,8 @@ def main():
     rp = sub.add_parser("train", help="train a network on one GPU")
     rp.add_argument("--exp", nargs="+", default=["tcn_baseline.yaml"],
                     help="experiment yaml(s) under configs/experiments/")
+    rp.add_argument("--exp-glob", dest="exp_glob",
+                    help="glob under configs/experiments/, e.g. 'generated/arch_*.yaml'")
     rp.add_argument("--seeds", nargs="+", type=int, default=[0])
     rp.add_argument("--epochs", type=int, help="override the experiment yaml")
     rp.add_argument("--limit", type=int, help="first N segments per fold")
@@ -110,7 +112,12 @@ def main():
         need = [a.data, ROOT / "configs/models" / a.model,
                 ROOT / "configs/drones" / a.drone]
     else:
-        need = [ROOT / "configs/experiments" / e for e in a.exp]
+        exps = ROOT / "configs/experiments"
+        if a.exp_glob:
+            a.exp = sorted(str(p.relative_to(exps)) for p in exps.glob(a.exp_glob))
+            if not a.exp:
+                sys.exit(f"no experiments match {a.exp_glob}")
+        need = [exps / e for e in a.exp]
     for x in need:
         if not x.exists():
             sys.exit(f"not found: {x}")
