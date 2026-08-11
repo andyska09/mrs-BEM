@@ -1,0 +1,31 @@
+# CMA-ES run 2026-07-22-18-39-25, loss both: all 19 tunables free
+name: bem_f19
+drone: paper_quad
+models:
+  - type: bem
+    lift_coefficient: 6.60671088
+    drag_coefficient: 12.4309794
+    hinge_spring_constant: 13.3869264
+    lift_offset: 0.22952637
+    hforce_scale: 0.951486699
+    pitch: 19.4018369
+    twist: -19.1978747
+    chord_inner: 0.0112351501
+    chord_outer: 0.00290800775
+    radius: 0.069730123
+    num_blades: 3
+    air_density: 1.204
+    polar: sin_cos
+    chord: linear
+  - type: body_drag
+    horizontal_drag_coefficient: 2.93662662
+    vertical_drag_coefficient: 0.775105522
+    frontarea_x: 0.00333096011
+    frontarea_y: 0.00758349416
+    frontarea_z: 0.00188200032
+    air_density: 1.204
+airframe:
+  thrust_scale: 1.16552995
+  dx: 0.0852370121
+  dy: 0.0522000872
+  dz: 0.023008014
