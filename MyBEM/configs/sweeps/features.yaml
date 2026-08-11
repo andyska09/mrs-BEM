@@ -1,0 +1,16 @@
+base: tcn_baseline.yaml
+
+runs:
+  - name: feat_no_angvel
+    features: [linvel, motors]
+  - name: feat_no_linvel
+    features: [angvel, motors]
+  - name: feat_no_motors
+    features: [angvel, linvel]
+
+  - name: feat_angvel
+    features: [angvel]
+  - name: feat_linvel
+    features: [linvel]
+  - name: feat_motors
+    features: [motors]
