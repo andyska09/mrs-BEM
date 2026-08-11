@@ -1,0 +1,9 @@
+base: tcn_baseline.yaml
+
+runs:
+  - name: tcn_f5
+    preds: bem_f5
+  - name: tcn_f16
+    preds: bem_f16
+  - name: tcn_f19
+    preds: bem_f19
