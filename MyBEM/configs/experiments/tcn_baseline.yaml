@@ -6,10 +6,8 @@ seed: 0
 
 history: 20
 features: [angvel, linvel, motors]
-max_speed: 0          
+max_speed: 0
 batch_size: 128
-device: cpu           # cpu | mps | cuda; mps 
-threads: 1            
 
 net: {arch: tcn, kernels: [7, 5], filters: [32, 32], neurons: [20], two_heads: true}
 
