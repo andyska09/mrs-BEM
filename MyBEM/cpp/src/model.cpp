@@ -1,7 +1,9 @@
 #include "mybem/model.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 
 #include "mybem/yaml.h"
 
@@ -86,8 +88,8 @@ Model Model::load(const std::string& path) {
   return m;
 }
 
-void Model::save(const std::string& path) const {
-  YamlWriter w(path);
+std::string Model::text() const {
+  YamlWriter w;
   if (!name_.empty()) w.scalar("name", name_);
   if (!drone_.empty()) w.scalar("drone", drone_);
 
@@ -103,6 +105,28 @@ void Model::save(const std::string& path) const {
   Leaf af;
   for (const auto& kv : airframe_.params()) af[kv.first] = fmt(kv.second);
   w.section("airframe", af);
+  return w.str();
+}
+
+void Model::save(const std::string& path) const {
+  std::ofstream out(path);
+  if (!out) {
+    printf("Cannot write %s\n", path.c_str());
+    return;
+  }
+  out << text();
+}
+
+std::string Model::hash() const {
+  uint64_t h = 14695981039346656037ULL;  // FNV-1a
+  for (unsigned char c : text()) {
+    h ^= c;
+    h *= 1099511628211ULL;
+  }
+  char buf[8];
+  snprintf(buf, sizeof(buf), "%06llx",
+           static_cast<unsigned long long>(h & 0xffffff));
+  return buf;
 }
 
 Wrench Model::evaluate(const State& s) {

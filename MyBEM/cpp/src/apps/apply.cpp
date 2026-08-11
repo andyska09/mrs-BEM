@@ -99,13 +99,14 @@ int main(int argc, char** argv) {
   if (argc != 4) {
     printf("usage: mybem-apply MODEL.yaml INPUT PREDSDIR\n"
            "  INPUT     a merged_*_seg_*.csv or a directory of them\n"
-           "  PREDSDIR  output root; files go to PREDSDIR/<model name>/\n"
+           "  PREDSDIR  output root; files go to PREDSDIR/<model name>@<hash>/\n"
            "            existing outputs are skipped, so re-running resumes\n");
     return 1;
   }
 
   Model model = Model::load(argv[1]);
-  const fs::path out_dir = fs::path(argv[3]) / model.name();
+  const fs::path out_dir =
+      fs::path(argv[3]) / (model.name() + "@" + model.hash());
   fs::create_directories(out_dir);
   model.save((out_dir / "params.yaml").string());
 

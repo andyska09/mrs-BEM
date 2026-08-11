@@ -102,6 +102,7 @@ std::string fmt(double v) {
 YamlWriter::YamlWriter(const std::string& path) : path_(path) {}
 
 YamlWriter::~YamlWriter() {
+  if (path_.empty()) return;
   std::ofstream out(path_);
   if (!out) {
     printf("Cannot write %s\n", path_.c_str());

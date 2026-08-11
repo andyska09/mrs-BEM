@@ -23,6 +23,7 @@ YamlDoc readYaml(const std::string& path);
 /* Emits the schema readYaml accepts: load/save round-trips losslessly. */
 class YamlWriter {
  public:
+  YamlWriter() = default;
   explicit YamlWriter(const std::string& path);
   ~YamlWriter();
 
@@ -30,6 +31,8 @@ class YamlWriter {
   void section(const std::string& key, const Leaf& values);
   void beginList(const std::string& key);
   void listItem(const Leaf& values, const std::string& first_key);
+
+  const std::string& str() const { return buf_; }
 
  private:
   std::string path_;

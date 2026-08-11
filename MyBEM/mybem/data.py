@@ -47,23 +47,41 @@ def split(name, ids):
     return folds
 
 
+def preds_dir(name):
+    """A store/preds folder, by exact name or by the unique <name>@hash applied from it."""
+    if (PREDS / name).is_dir():
+        return PREDS / name
+    hits = sorted(PREDS.glob(f"{name}@*"))
+    if len(hits) > 1:
+        raise SystemExit(f"'{name}' matches {[d.name for d in hits]}")
+    if not hits:
+        raise SystemExit(f"'{name}': no predictions in {PREDS}")
+    return hits[0]
+
+
+def read_preds(pdir, sid, d):
+    """One prediction CSV as force|torque, checked against the rows it belongs to."""
+    p = pd.read_csv(pdir / f"{sid}.csv", header=None).to_numpy(float)
+    if len(p) != len(d):
+        raise SystemExit(f"{sid}: {len(p)} prediction rows vs {len(d)} data rows")
+    if np.abs(p[:, 0] - d[:, 0]).max() > 1e-9:
+        raise SystemExit(f"{sid}: prediction time column does not match the data")
+    return p[:, 1:7]
+
+
 class Data:
     """All selected segments in one array, plus per-segment (start, stop) bounds."""
 
     def __init__(self, preds, ids, features, drone, source=DATA):
+        pdir = preds_dir(preds)
         feat, label, base, bounds, n = [], [], [], [], 0
         for sid in ids:
             d = load(sid, source)
-            p = pd.read_csv(PREDS / preds / f"{sid}.csv", header=None).to_numpy(float)
-            if len(p) != len(d):
-                raise SystemExit(f"{sid}: {len(p)} prediction rows vs {len(d)} data rows")
-            if np.abs(p[:, 0] - d[:, 0]).max() > 1e-9:
-                raise SystemExit(f"{sid}: prediction time column does not match the data")
-
+            p = read_preds(pdir, sid, d)
             fm, tm = drone.measured(d)
-            label.append(np.hstack([fm - p[:, 1:4], tm - p[:, 4:7]]))
+            label.append(np.hstack([fm, tm]) - p)
             feat.append(np.hstack([d[:, FEATURES[g]] for g in features]))
-            base.append(p[:, 1:7])
+            base.append(p)
             bounds.append((n, n + len(d)))
             n += len(d)
 

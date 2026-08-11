@@ -11,6 +11,10 @@ class Model {
   static Model load(const std::string& path);
   void save(const std::string& path) const;
 
+  /* The resolved config, and the 6-hex id of it that names a preds folder. */
+  std::string text() const;
+  std::string hash() const;
+
   Wrench evaluate(const State&);
 
   std::vector<TunableParam> tunables() const;

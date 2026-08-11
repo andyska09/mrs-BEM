@@ -18,6 +18,10 @@ from .nets import create_net
 from .paths import NETS
 
 
+def digest(cfg):
+    return hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest()[:6]
+
+
 def cosine_restarts(step, first_decay_steps, t_mul, m_mul, alpha):
     """tf.keras.experimental.CosineDecayRestarts as a step -> lr multiplier."""
     frac = step / first_decay_steps
@@ -55,19 +59,20 @@ def normalize(data, norm, device):
             (t(data.label) - t(norm["means_out"])) / t(norm["stds_out"]))
 
 
-def run(exp_path, seed=None, limit=None, epochs=None, device=None):
+def run(exp_path, seed=None, limit=None, epochs=None, device=None, threads=1):
     with open(exp_path) as f:
         cfg = yaml.safe_load(f)
+    # Machine settings are not part of the experiment, so not part of its hash.
+    cfg.pop("device", None)
+    cfg.pop("threads", None)
     if seed is not None:
         cfg["seed"] = seed
     if epochs is not None:
         cfg["optim"]["epochs"] = epochs
-    if device is not None:
-        cfg["device"] = device
     history, cut = cfg["history"], cfg["max_speed"]
-    device = torch.device(cfg["device"])
+    device = torch.device(device or "cpu")
     # The model is ~28k params; multithreading tiny ops costs more than it saves.
-    torch.set_num_threads(cfg["threads"])
+    torch.set_num_threads(threads)
     drone = Drone.load(cfg["drone"])
 
     folds = split(cfg["split"], segment_ids())
@@ -84,7 +89,9 @@ def run(exp_path, seed=None, limit=None, epochs=None, device=None):
     print(f"rows {len(train.feat)}/{len(val.feat)}   windows {len(tw)}/{len(vw)}")
 
     saved = {**cfg, "segments": folds}
-    h = hashlib.sha256(json.dumps(saved, sort_keys=True).encode()).hexdigest()[:6]
+    h = digest(saved)
+    # Runs sharing a group differ only by seed, which is what report.py averages.
+    saved["group"] = digest({k: v for k, v in saved.items() if k != "seed"})
     out = NETS / f"{cfg['name']}@{h}"
     (out / "tb").mkdir(parents=True, exist_ok=True)
     with open(out / "config.yaml", "w") as f:
@@ -167,8 +174,9 @@ def main():
     p.add_argument("--limit", type=int, help="use only the first N segments per fold")
     p.add_argument("--epochs", type=int)
     p.add_argument("--device", choices=["cpu", "cuda", "mps"])
+    p.add_argument("--threads", type=int, default=1)
     a = p.parse_args()
-    run(a.experiment, a.seed, a.limit, a.epochs, a.device)
+    run(a.experiment, a.seed, a.limit, a.epochs, a.device, a.threads)
 
 
 if __name__ == "__main__":
