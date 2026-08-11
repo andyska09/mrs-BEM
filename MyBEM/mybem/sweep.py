@@ -1,6 +1,6 @@
 """Expand a sweep yaml into one experiment yaml per run.
 
-configs/sweeps/<name>.yaml -> configs/experiments/generated/<run name>.yaml,
+configs/sweeps/<name>.yaml -> configs/nets/generated/<run name>.yaml,
 then feed the printed list to submit.py --exp.
 """
 
@@ -8,7 +8,7 @@ import argparse
 
 import yaml
 
-from .paths import EXPERIMENTS, SWEEPS
+from .paths import NET_CONFIGS, SWEEPS
 
 
 def merge(base, over):
@@ -21,10 +21,10 @@ def merge(base, over):
 def expand(sweep):
     with open(SWEEPS / sweep) as f:
         cfg = yaml.safe_load(f)
-    with open(EXPERIMENTS / cfg["base"]) as f:
+    with open(NET_CONFIGS / cfg["base"]) as f:
         base = yaml.safe_load(f)
 
-    out = EXPERIMENTS / "generated"
+    out = NET_CONFIGS / "generated"
     out.mkdir(exist_ok=True)
     names = []
     for run in cfg["runs"]:
@@ -45,7 +45,7 @@ def main():
     p.add_argument("sweep", help="file under configs/sweeps/")
     a = p.parse_args()
     names = expand(a.sweep)
-    print(f"{len(names)} experiments in {EXPERIMENTS / 'generated'}\n")
+    print(f"{len(names)} experiments in {NET_CONFIGS / 'generated'}\n")
     print("--exp " + " ".join(names))
 
 

@@ -38,7 +38,7 @@ train)
     cd "$ROOT"
     conda activate "$PBS_O_HOME/.conda/envs/mybem"
     nvidia-smi -L
-    python -m mybem.train "configs/experiments/$EXP" --seed "$SEED" --device cuda \
+    python -m mybem.train "configs/nets/$EXP" --seed "$SEED" --device cuda \
         ${EPOCHS:+--epochs "$EPOCHS"} ${LIMIT:+--limit "$LIMIT"}
     ;;
 esac

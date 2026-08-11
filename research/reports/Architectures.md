@@ -17,7 +17,7 @@ capacity land in the same place?
 
 Base model `bem_default`, no CMA-ES variant. Everything except `net:` and
 `optim.l2` held at
-[tcn_baseline.yaml](../../MyBEM/configs/experiments/tcn_baseline.yaml): `paper`
+[tcn_baseline.yaml](../../MyBEM/configs/nets/tcn_baseline.yaml): `paper`
 split, history 20, features `[angvel, linvel, motors]` (10 dims), `max_speed: 0`,
 `two_heads: true`, Adam 120 epochs.
 

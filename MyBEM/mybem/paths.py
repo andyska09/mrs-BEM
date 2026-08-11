@@ -8,7 +8,7 @@ CONFIGS = ROOT / "configs"
 MODELS = CONFIGS / "models"
 DRONES = CONFIGS / "drones"
 SPLITS = CONFIGS / "splits"
-EXPERIMENTS = CONFIGS / "experiments"
+NET_CONFIGS = CONFIGS / "nets"
 SWEEPS = CONFIGS / "sweeps"
 
 DATA = ROOT.parent / "data" / "processed_data"
