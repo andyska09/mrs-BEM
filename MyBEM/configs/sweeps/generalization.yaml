@@ -1,0 +1,28 @@
+base: tcn_baseline.yaml
+
+# The paper's `*` experiment: how much does the residual degrade when it never
+# saw fast flight? Splits come from scripts/make_splits.py.
+#   full  everything
+#   slow  whole segments with vmax <= 5 m/s (the paper's reduced set)
+#   ctrl  random whole segments, row-count-matched to slow
+#   win   every window that stays <= 5 m/s, full segment pool
+runs:
+  - name: gen_bem_full
+  - name: gen_bem_slow
+    split: gen_slow
+  - name: gen_bem_ctrl
+    split: gen_ctrl
+  - name: gen_bem_win
+    max_speed: 5.0
+
+  - name: gen_none_full
+    preds: none
+  - name: gen_none_slow
+    preds: none
+    split: gen_slow
+  - name: gen_none_ctrl
+    preds: none
+    split: gen_ctrl
+  - name: gen_none_win
+    preds: none
+    max_speed: 5.0

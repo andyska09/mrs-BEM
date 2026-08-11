@@ -1,0 +1,43 @@
+name: gen_none_full
+preds: none
+drone: paper_quad
+split: paper
+seed: 0
+history: 20
+features:
+- angvel
+- linvel
+- motors
+max_speed: 0
+batch_size: 128
+net:
+  arch: tcn
+  kernels:
+  - 7
+  - 5
+  filters:
+  - 32
+  - 32
+  neurons:
+  - 20
+  two_heads: true
+loss:
+  weight_force: 1.0
+  weight_torque: 1.0
+  axis_weight_force:
+  - 1.0
+  - 1.0
+  - 3.0
+  axis_weight_torque:
+  - 1.0
+  - 1.0
+  - 1.0
+optim:
+  epochs: 120
+  lr: 0.001
+  l2: 0.0
+  scheduler:
+    first_decay_steps: 10000
+    t_mul: 1.5
+    m_mul: 0.75
+    alpha: 0.01
