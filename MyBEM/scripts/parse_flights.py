@@ -10,7 +10,11 @@ import re
 from collections import Counter
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
+
 ROOT = Path(__file__).resolve().parent.parent
+LINVEL = [14, 15, 16]
 
 # First match wins: "3d circle" and "battery test ... short circle" before "circle".
 FAMILIES = [
@@ -60,8 +64,11 @@ def main():
         if flight not in labels:
             print(f"no Flights.txt entry for {flight}")
             continue
+        v = pd.read_csv(path, usecols=LINVEL).to_numpy(float)
         rows.append({"id": sid, "flight": flight, "seg": int(seg),
-                     **parse(labels[flight]), "comment": labels[flight]})
+                     **parse(labels[flight]), "n": len(v),
+                     "vmax": round(float(np.linalg.norm(v, axis=1).max()), 3),
+                     "comment": labels[flight]})
 
     if not rows:
         raise SystemExit(f"no segments under {a.data}")
