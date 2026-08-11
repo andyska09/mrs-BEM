@@ -7,8 +7,9 @@ import numpy as np
 import torch
 import yaml
 
-from .eval import PAPER, run
-from .train import NETS
+from .eval import run
+from .metrics import PAPER
+from .paths import NETS
 
 
 def collect(match):

@@ -13,12 +13,13 @@ from dataclasses import dataclass
 from itertools import product
 
 import numpy as np
-import pandas as pd
 import yaml
 
-from .data import DATA, segment_ids, split
-from .drone import ACC, ANGVEL, LINVEL, MOTORS, ROOT, Drone
-from .eval import table
+from .columns import ACC, ANGVEL, LINVEL, MOTORS, load
+from .data import segment_ids, split
+from .drone import Drone
+from .metrics import COLS, table
+from .paths import DATA, POLYFIT
 
 FLU2FRD = np.array([1.0, -1.0, -1.0])
 
@@ -311,7 +312,7 @@ def identify(ids, drone, geo, ct, nbins, source=DATA, verbose=True):
              for a in AXES for b in range(nbins)}
 
     for sid in ids:
-        d = pd.read_csv(source / f"merged_{sid}.csv").to_numpy(float)
+        d = load(sid, source)
         s, ob = states(d, geo, ct)
         f, t = drone.measured(d)
         c = coefficients(f * FLU2FRD, t * FLU2FRD, geo, ob)
@@ -374,13 +375,12 @@ def rmse(model, ids, drone, source=DATA):
     """Paper Table II metrics of the residual left by the model."""
     ef, et = [], []
     for sid in ids:
-        d = pd.read_csv(source / f"merged_{sid}.csv").to_numpy(float)
+        d = load(sid, source)
         fm, tm = drone.measured(d)
         fp, tp = predict(model, d)
         ef.append(fm - fp)
         et.append(tm - tp)
-    return dict(zip(("Fxy", "Fz", "F", "Mxy", "Mz", "M"),
-                    table(np.vstack(ef), np.vstack(et))))
+    return dict(zip(COLS, table(np.vstack(ef), np.vstack(et))))
 
 
 def main():
@@ -398,12 +398,11 @@ def main():
     train = folds["train"][:a.limit] if a.limit else folds["train"]
     test = folds["test"][:a.limit] if a.limit else folds["test"]
 
-    ct = hover_ct(pd.read_csv(DATA / f"merged_{train[0]}.csv").to_numpy(float),
-                  drone, geo)
+    ct = hover_ct(load(train[0]), drone, geo)
     print(f"train={len(train)} test={len(test)} bins={a.bins} Ct,h={ct:.5f}")
     model = identify(train, drone, geo, ct, a.bins)
 
-    out = ROOT / "store" / "polyfit" / a.name
+    out = POLYFIT / a.name
     out.mkdir(parents=True, exist_ok=True)
     with open(out / "polyfit.yaml", "w") as f:
         yaml.safe_dump(model, f, sort_keys=False)
@@ -414,12 +413,10 @@ def main():
                 for term, coef in b["terms"].items():
                     f.write(f"{axis} {k} {term} {coef:.12g}\n")
 
-    print(f"\n{'':10s}" + "".join(f"{k:>9s}" for k in
-                                  ("Fxy", "Fz", "F", "Mxy", "Mz", "M")))
+    print(f"\n{'':10s}" + "".join(f"{k:>9s}" for k in COLS))
     for fold, sids in (("train", train), ("test", test)):
         m = rmse(model, sids, drone)
-        print(f"{fold:10s}" + "".join(f"{m[k]:9.3f}" for k in
-                                      ("Fxy", "Fz", "F", "Mxy", "Mz", "M")))
+        print(f"{fold:10s}" + "".join(f"{m[k]:9.3f}" for k in COLS))
     print(f"\nwrote {out / 'polyfit.yaml'}")
 
 

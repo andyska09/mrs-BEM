@@ -13,10 +13,9 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from .data import Data, segment_ids, split
-from .drone import ROOT, Drone
+from .drone import Drone
 from .nets import create_net
-
-NETS = ROOT / "store" / "nets"
+from .paths import NETS
 
 
 def cosine_restarts(step, first_decay_steps, t_mul, m_mul, alpha):

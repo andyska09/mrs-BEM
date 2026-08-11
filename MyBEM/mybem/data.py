@@ -7,10 +7,8 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from .drone import ANGVEL, ATT, LINVEL, MOTORS, POS, ROOT
-
-DATA = ROOT.parent / "data" / "processed_data"
-PREDS = ROOT / "store" / "preds"
+from .columns import ANGVEL, ATT, LINVEL, MOTORS, POS, load
+from .paths import DATA, PREDS, SPLITS
 
 FEATURES = {"pos": POS, "att": ATT, "angvel": ANGVEL, "linvel": LINVEL, "motors": MOTORS}
 
@@ -27,7 +25,7 @@ def split(name, ids):
     split's seed and the sized folds are cut off it. Fold order in the yaml is
     irrelevant; train is whatever is left.
     """
-    with open(ROOT / "configs" / "splits" / f"{name}.yaml") as f:
+    with open(SPLITS / f"{name}.yaml") as f:
         cfg = yaml.safe_load(f)
 
     rules = {k: v for k, v in cfg.items() if k not in ("name", "seed")}
@@ -55,7 +53,7 @@ class Data:
     def __init__(self, preds, ids, features, drone, source=DATA):
         feat, label, base, bounds, n = [], [], [], [], 0
         for sid in ids:
-            d = pd.read_csv(source / f"merged_{sid}.csv").to_numpy(float)
+            d = load(sid, source)
             p = pd.read_csv(PREDS / preds / f"{sid}.csv", header=None).to_numpy(float)
             if len(p) != len(d):
                 raise SystemExit(f"{sid}: {len(p)} prediction rows vs {len(d)} data rows")

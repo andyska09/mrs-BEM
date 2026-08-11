@@ -8,9 +8,7 @@ import argparse
 
 import yaml
 
-from .drone import ROOT
-
-EXPERIMENTS = ROOT / "configs" / "experiments"
+from .paths import EXPERIMENTS, SWEEPS
 
 
 def merge(base, over):
@@ -21,7 +19,7 @@ def merge(base, over):
 
 
 def expand(sweep):
-    with open(ROOT / "configs" / "sweeps" / sweep) as f:
+    with open(SWEEPS / sweep) as f:
         cfg = yaml.safe_load(f)
     with open(EXPERIMENTS / cfg["base"]) as f:
         base = yaml.safe_load(f)
