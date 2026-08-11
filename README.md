@@ -28,7 +28,7 @@ MyBEM/cpp/build/mybem-tune MODEL.yaml DATA.csv --drone configs/drones/paper_quad
 ```
 Train and evaluate the residual net (from `MyBEM/`):
 ```
-conda run -n mybem python -m mybem.train configs/experiments/tcn_baseline.yaml
+conda run -n mybem python -m mybem.train configs/nets/tcn_baseline.yaml
 ```
 ```
 conda run -n mybem python -m mybem.eval tcn_baseline --on test
