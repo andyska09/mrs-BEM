@@ -18,6 +18,10 @@ class Component {
   virtual Options options() const { return {}; }
   virtual std::vector<TunableParam> tunables() const = 0;
 
+  /* Option keys holding a filesystem path. Model resolves them against the
+   * yaml's own directory, and hashes the file content instead of the path. */
+  virtual std::vector<std::string> pathOptions() const { return {}; }
+
   virtual std::vector<std::string> diagnostics() const { return {}; }
   virtual void diagnose(const State&, const Airframe&, std::vector<double>&) {}
 };

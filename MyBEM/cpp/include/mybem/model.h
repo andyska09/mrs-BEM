@@ -27,6 +27,9 @@ class Model {
   size_t size() const { return components_.size(); }
 
  private:
+  /* content_ids: path options are emitted as the hash of the file they name. */
+  std::string render(bool content_ids) const;
+
   std::string name_;
   std::string drone_;
   Airframe airframe_;

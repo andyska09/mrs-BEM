@@ -34,12 +34,18 @@ def induced(mu_x, mu_y, mu_z, ct_hover, iters=64):
     return nu
 
 
-def hover_ct(d, drone, geo, mu_max=0.05):
-    """Thrust coefficient near hover, the Ct,h of the induced-velocity solve."""
-    ob = np.sqrt((d[:, MOTORS] ** 2).mean(1))
-    near = np.linalg.norm(d[:, LINVEL], axis=1) / (ob * geo.radius) < mu_max
-    q = geo.air_density * geo.disc_area * (geo.radius * ob) ** 2
-    return float((drone.mass * d[near, ACC[2]] / q[near]).mean())
+def hover_ct(segments, drone, geo, mu_max=0.05):
+    """Thrust coefficient near hover, pooled over every near-hover row given."""
+    total, rows = 0.0, 0
+    for d in segments:
+        ob = np.sqrt((d[:, MOTORS] ** 2).mean(1))
+        near = np.linalg.norm(d[:, LINVEL], axis=1) / (ob * geo.radius) < mu_max
+        q = geo.air_density * geo.disc_area * (geo.radius * ob) ** 2
+        total += (drone.mass * d[near, ACC[2]] / q[near]).sum()
+        rows += int(near.sum())
+    if not rows:
+        raise SystemExit(f"no rows below mu={mu_max} to identify Ct,h")
+    return float(total / rows)
 
 
 def states(d, geo, ct_hover):
@@ -70,8 +76,8 @@ def states(d, geo, ct_hover):
 def sideslip(s):
     """|beta| in degrees, paper eq. 2. Zero where airspeed vanishes."""
     h = np.hypot(s["mu_x"], s["mu_y"])
-    return np.degrees(np.arcsin(np.divide(s["abs_mu_y"], h, out=np.zeros_like(h),
-                                          where=h > 1e-9)))
+    r = np.divide(s["abs_mu_y"], h, out=np.zeros_like(h), where=h > 1e-9)
+    return np.degrees(np.arcsin(np.minimum(r, 1.0)))
 
 
 def coefficients(f, t, geo, ob):

@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
+#include <sstream>
 
 #include "mybem/yaml.h"
 
@@ -13,6 +15,26 @@ namespace {
 [[noreturn]] void fail(const std::string& msg) {
   printf("model: %s\n", msg.c_str());
   exit(1);
+}
+
+uint64_t fnv1a(const std::string& s) {
+  uint64_t h = 14695981039346656037ULL;
+  for (unsigned char c : s) {
+    h ^= c;
+    h *= 1099511628211ULL;
+  }
+  return h;
+}
+
+std::string fileId(const std::string& path) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in) return "missing";
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  char buf[24];
+  snprintf(buf, sizeof(buf), "%016llx",
+           static_cast<unsigned long long>(fnv1a(ss.str())));
+  return buf;
 }
 
 bool asDouble(const std::string& s, double& out) {
@@ -78,6 +100,14 @@ Model Model::load(const std::string& path) {
         o[kv.first] = kv.second;
       }
     }
+
+    for (const std::string& key : c->pathOptions()) {
+      auto opt = o.find(key);
+      if (opt == o.end() || opt->second.empty()) continue;
+      std::filesystem::path v(opt->second);
+      if (v.is_relative()) v = std::filesystem::path(path).parent_path() / v;
+      opt->second = std::filesystem::weakly_canonical(v).string();
+    }
     c->load(p, o);
 
     const int n = seen[type->second]++;
@@ -88,7 +118,7 @@ Model Model::load(const std::string& path) {
   return m;
 }
 
-std::string Model::text() const {
+std::string Model::render(bool content_ids) const {
   YamlWriter w;
   if (!name_.empty()) w.scalar("name", name_);
   if (!drone_.empty()) w.scalar("drone", drone_);
@@ -98,7 +128,13 @@ std::string Model::text() const {
     Leaf item;
     item["type"] = c->type();
     for (const auto& kv : c->params()) item[kv.first] = fmt(kv.second);
-    for (const auto& kv : c->options()) item[kv.first] = kv.second;
+    Options o = c->options();
+    if (content_ids)
+      for (const std::string& key : c->pathOptions()) {
+        auto opt = o.find(key);
+        if (opt != o.end()) opt->second = fileId(opt->second);
+      }
+    for (const auto& kv : o) item[kv.first] = kv.second;
     w.listItem(item, "type");
   }
 
@@ -107,6 +143,8 @@ std::string Model::text() const {
   w.section("airframe", af);
   return w.str();
 }
+
+std::string Model::text() const { return render(false); }
 
 void Model::save(const std::string& path) const {
   std::ofstream out(path);
@@ -118,11 +156,7 @@ void Model::save(const std::string& path) const {
 }
 
 std::string Model::hash() const {
-  uint64_t h = 14695981039346656037ULL;  // FNV-1a
-  for (unsigned char c : text()) {
-    h ^= c;
-    h *= 1099511628211ULL;
-  }
+  const uint64_t h = fnv1a(render(true));
   char buf[8];
   snprintf(buf, sizeof(buf), "%06llx",
            static_cast<unsigned long long>(h & 0xffffff));

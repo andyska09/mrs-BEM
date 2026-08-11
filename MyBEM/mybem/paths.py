@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 CONFIGS = ROOT / "configs"
+MODELS = CONFIGS / "models"
 DRONES = CONFIGS / "drones"
 SPLITS = CONFIGS / "splits"
 EXPERIMENTS = CONFIGS / "experiments"

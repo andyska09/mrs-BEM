@@ -9,3 +9,7 @@ MyBEM/logs
 
 #pdfs source of papers
 *.pdf
+
+# ai 
+/.claude
+/.agents

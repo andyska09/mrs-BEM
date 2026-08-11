@@ -34,7 +34,7 @@ def identify(ids, drone, geo, ct, nbins, source=DATA, verbose=True):
                     grams[(axis, k)].add(x[m], c[m, ai])
 
     model = {"ct_hover": ct, "radius": geo.radius, "air_density": geo.air_density,
-             "ref_length": geo.ref_length, "n_rotors": geo.n_rotors,
+             "dx": geo.dx, "dy": geo.dy, "n_rotors": geo.n_rotors,
              "beta_edges": edges.tolist(), "axes": {}}
     for axis in AXES:
         fixed, cand = columns(axis)
@@ -55,10 +55,14 @@ def identify(ids, drone, geo, ct, nbins, source=DATA, verbose=True):
     return model
 
 
-def predict(model, d, drone=None):
+def geometry(model):
+    return Geometry(radius=model["radius"], air_density=model["air_density"],
+                    dx=model["dx"], dy=model["dy"], n_rotors=model["n_rotors"])
+
+
+def predict(model, d):
     """Model dict + merged rows -> force and torque in body FLU."""
-    geo = Geometry(radius=model["radius"], air_density=model["air_density"],
-                   n_rotors=model["n_rotors"])
+    geo = geometry(model)
     s, ob = states(d, geo, model["ct_hover"])
     edges = np.asarray(model["beta_edges"])
     nb = len(edges) - 1
@@ -76,7 +80,7 @@ def predict(model, d, drone=None):
 
     q = geo.air_density * geo.disc_area * (geo.radius * ob) ** 2
     f = out[:, :3] * q[:, None]
-    t = out[:, 3:] * (q * model["ref_length"])[:, None]
+    t = out[:, 3:] * (q * geo.ref_length)[:, None]
     return f * FLU2FRD, t * FLU2FRD
 
 

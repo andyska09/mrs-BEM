@@ -49,6 +49,7 @@ void PolyfitModel::load(const Params& p, const Options& o) {
   rho_ = p.at("air_density");
   ct_hover_ = p.at("ct_hover");
   ref_length_ = p.at("ref_length");
+  if (loaded_ && o.at("coeffs") == coeffs_) return;
   coeffs_ = o.at("coeffs");
 
   std::ifstream in(coeffs_);
@@ -71,6 +72,7 @@ void PolyfitModel::load(const Params& p, const Options& o) {
       edges_.clear();
       for (double v; ss >> v;) edges_.push_back(v);
       if (edges_.size() < 2) fail(coeffs_, no, "beta_edges needs >= 2 values");
+      for (auto& a : axes_) a.resize(edges_.size() - 1);
       got_edges = true;
       continue;
     }
@@ -103,11 +105,11 @@ void PolyfitModel::load(const Params& p, const Options& o) {
         i = star + 1;
       }
     }
-    axes_[axis].resize(edges_.size() - 1);
     axes_[axis][bin].push_back(std::move(t));
   }
 
   for (auto& a : axes_) a.resize(edges_.size() - 1);
+  loaded_ = true;
 }
 
 void PolyfitModel::add(const State& s, const Airframe& af, Wrench& w) {
