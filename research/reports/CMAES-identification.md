@@ -1,6 +1,8 @@
 # CMA-ES re-identification of the BEM parameters
 
-Status: **run, results below.** Old stack (`NeuroBEM/`), `cmaes` binary.
+Status: **run, results below.** Fits were done on the old stack (`NeuroBEM/`,
+`cmaes` binary); the three carried-forward tunes were then ported to MyBEM and
+re-evaluated there — last section.
 
 ## Setup
 
@@ -113,3 +115,80 @@ baseline `20260708-223500`.
   reach that torque path.
 - `Mz` gets *worse* in c1 and c3 (0.015 → 0.025 / 0.029) while `Mxy` improves;
   the combined M still improves because `Mxy` dominates.
+
+## Port to MyBEM
+
+The three tunes were transcribed into MyBEM model configs; no refit was run.
+Names now carry the number of freed parameters instead of c1/c2/c3:
+
+| old | MyBEM config | freed |
+|---|---|---|
+| c1 | [bem_f5.yaml](../../MyBEM/configs/models/bem_f5.yaml) | 5 |
+| c3 | [bem_f16.yaml](../../MyBEM/configs/models/bem_f16.yaml) | 16 |
+| c2 | [bem_f19.yaml](../../MyBEM/configs/models/bem_f19.yaml) | 19 |
+
+The old `best.yaml` sections map onto the MyBEM schema 1:1 — `bem:` → the `bem`
+component, `quad:` → `airframe:`, `body_drag:` → the `body_drag` component. Two
+keys had to be added because they were compile-time in the old stack: `polar:
+sin_cos` and `chord: linear`, which are what `MODEL 1` selected
+([params.h:33-35](../../NeuroBEM/code/simulator/include/params.h#L33)).
+
+Transcription check: `mybem-tune` on the same `subset_20k.csv` reproduces each
+run's original `metrics.csv` to 4 significant digits (F/M — f5 0.6710/0.05481,
+f16 0.5992/0.03053, f19 0.7748/0.05661).
+
+### Base model, MyBEM test split
+
+Same 13 held-out segments, scored by `mybem.eval`, 215 829 rows per config.
+Improvement is relative to the untuned `bem_default`, as in the old-stack table.
+
+| config | Fxy | Fz | F | F impr% | Mxy | Mz | M | M impr% |
+|---|---|---|---|---|---|---|---|---|
+| `bem_default` | 0.575 | 1.663 | 1.069 | +0.0% | 0.1272 | 0.0151 | 0.1043 | +0.0% |
+| `bem_f5` | 0.626 | 1.086 | 0.809 | +24.3% | 0.0837 | 0.0254 | 0.0699 | +33.0% |
+| `bem_f16` | 0.413 | 0.899 | **0.619** | **+42.1%** | 0.0395 | 0.0285 | **0.0362** | **+65.3%** |
+| `bem_f19` | 0.829 | 1.006 | 0.892 | +16.6% | 0.0884 | 0.0087 | 0.0724 | +30.6% |
+| paper BEM | 0.803 | 1.265 | 0.982 | +8.1% | 0.0900 | 0.0170 | 0.0740 | +29.0% |
+
+Every row reproduces the old-stack table above at its printed precision, so the
+two pipelines agree on the base model despite the different output precision
+(`%.12g` vs `%lf`) and the inertia used for the measured wrench.
+
+### BEM + residual TCN, 3 seeds
+
+Identical net config across arms (`tcn_baseline`: paper TCN, two heads,
+`angvel+linvel+motors`, history 20, 120 epochs); only `preds:` differs. Mean ±
+std over seeds 0/1/2, 27 814 parameters each.
+
+| config | val | Fxy | Fz | F | Mxy | Mz | M |
+|---|---|---|---|---|---|---|---|
+| `tcn_baseline` (1 seed) | 0.491 | 0.168 | 0.399 | 0.268 | 0.0082 | 0.0023 | 0.0069 |
+| `tcn_f5` | 0.753 | 0.188±0.002 | 0.401±0.010 | 0.278±0.005 | 0.0076±0.0002 | 0.0051±0.0001 | 0.0068±0.0002 |
+| `tcn_f16` | 1.039 | 0.179±0.000 | 0.380±0.014 | **0.264±0.006** | 0.0041±0.0001 | 0.0025±0.0000 | **0.0037±0.0001** |
+| `tcn_f19` | 0.695 | 0.191±0.002 | 0.404±0.016 | 0.280±0.009 | 0.0064±0.0001 | 0.0021±0.0000 | 0.0053±0.0001 |
+| paper BEM+NN | — | 0.204 | 0.504 | 0.335 | 0.0140 | 0.0040 | 0.0120 |
+
+### What changed against the old-stack hybrid numbers
+
+- **The base-model ranking now survives the NN.** On the old stack c2 (=f19)
+  gave the best hybrid F despite being the worse base model; here f16 is best as
+  a base model *and* best after the net, on both F and M, and f19 is last. The
+  old inversion was a single unseeded TF run per arm — with 3 seeds it does not
+  reproduce.
+- **Every arm is better than its old-stack counterpart** (F 0.264–0.280 vs
+  0.272–0.353). The training stacks differ in two known ways: MyBEM is seeded end
+  to end, and its batches mix segments, while the old loader shuffled only within
+  one flight.
+- **Val loss does not rank the arms.** `tcn_f16` has the worst val loss (1.039)
+  and the best test RMSE. The loss is MSE on residuals normalized per base model,
+  so each arm divides by its own residual std — the numbers are comparable across
+  seeds of one arm, never across arms.
+- **The spread between base models still collapses.** Best to worst, F is 0.619
+  → 1.069 (+73 %) before the net and 0.264 → 0.280 (+6 %) after; M is 0.0362 →
+  0.1043 (+188 %) before and 0.0037 → 0.0069 (+86 %) after. Torque keeps more of
+  the difference than force.
+- **The untuned base is not visibly worse after the net.** `tcn_baseline` sits at
+  F 0.268 — second best, ahead of both `tcn_f5` and `tcn_f19` — from a base model
+  with 73 % more force error than `bem_f16`. Only on `Mxy` does it stay clearly
+  behind (0.0082 vs 0.0041). It is a single seed, so treat the ordering against
+  `tcn_f16` (0.264±0.006) as a tie.
