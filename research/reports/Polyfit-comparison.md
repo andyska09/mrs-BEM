@@ -13,7 +13,7 @@ PolyFit is the Sun/de Visser/Chu model, introduced separately as a standalone ba
 
 ## Setup
 
-Base model `polyfit_paper`, 3 bins. Network is the paper TCN with `preds: polyfit_paper` and no other change ([tcn_polyfit.yaml](../../MyBEM/configs/nets/tcn_polyfit.yaml)), 3 seeds.
+Base model `polyfit_paper`, 3 bins. Network is the paper TCN with `preds: polyfit_paper` and no other change ([tcn_polyfit.yaml](../../MyBEM/configs/nets/tcn_polyfit.yaml)), 3 seeds. The BEM side is `arch_tcn`, the same net on `preds: bem_default`, also 3 seeds.
 
 ## Results
 
@@ -27,16 +27,17 @@ RMSE, force in N, torque in Nm.
 | | | | | | | |
 | bem_default | 0.575 | 1.664 | 1.069 | 0.1273 | 0.0151 | 0.1043 |
 | paper BEM | 0.803 | 1.265 | 0.982 | 0.0900 | 0.0170 | 0.0740 |
-| tcn_BEM (n=1) | 0.168 | 0.399 | 0.268 | 0.0082 | 0.0023 | 0.0069 |
+| arch_tcn (n=3) | 0.179 ±0.002 | 0.431 ±0.020 | 0.288 ±0.010 | 0.0086 ±0.0003 | 0.0023 ±0.0000 | 0.0072 ±0.0002 |
 | paper BEM+NN | 0.204 | 0.504 | 0.335 | 0.0140 | 0.0040 | 0.0120 |
 
 ## Findings
 
-- No, PolyFit + NN does not win. It is better on torque (M 0.0055 against 0.0069),
-  BEM + NN is better on force (F 0.268 against 0.322).
-- Both beat the published BEM+NN on every column except Mz, which is uninformative:
-  the largest yaw torque in the dataset is 0.072 Nm
-  ([:497](../sources/papers/RSS21_Bauersfeld.md#L497)).
+- No, PolyFit + NN does not win. It is better on torque (M 0.0055 against 0.0072),
+  BEM + NN is better on force (F 0.288 against 0.322).
+- Both beat the published BEM+NN on every column, `Mz` included (0.0035 and
+  0.0023 against 0.0040). `Mz` is the least informative column either way: the
+  trajectories are designed to minimize yaw rate and the largest yaw torque in
+  the dataset is 0.072 Nm ([:497](../sources/papers/RSS21_Bauersfeld.md#L497)).
 - Before training, PolyFit leads `bem_default` by 1.9x on force and 7.5x on torque.
   After training the order reverses on force. The residual absorbs most of the
   difference between the two bases, so a better base does not give a better model.
@@ -47,7 +48,6 @@ RMSE, force in N, torque in Nm.
 ## Caveats
 
 - `bem_default` is untuned, so the BEM side of this comparison is not the paper's BEM.
-- `tcn_BEM` is a single seed, so its row has no error bar to compare against.
 
 ## Open
 
