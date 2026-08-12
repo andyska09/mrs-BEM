@@ -1,3 +1,10 @@
+> **This is a partial copy of the original NeuroBEM release.**
+> Source: https://download.ifi.uzh.ch/rpg/NeuroBEM/ (framework + dataset).
+> The MATLAB pipeline (`Matlab/`, `Maple/`) and `ExampleData/` have been removed;
+> only the parts important for the training NN and running BEM on the processed data are kept — `Python/`, `simulator/`,
+> `Scripts/`. Sections below that reference the removed folders are left intact as
+> documentation of the original workflow; get those files from the link above.
+
 # Introduction
 ### Overview
 This README gives instructions and examples how the Neuro-BEM framework can be used. Neuro-BEM can be used to accurately simulate the Dynamics of a Drone by augmenting a first-principle blade element model with a neural network.
