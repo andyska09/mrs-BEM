@@ -44,23 +44,6 @@ byte-identical config, already trained — so 18 new jobs.
 | `feat_linvel` | `[linvel]` | 3 |
 | `feat_motors` | `[motors]` | 4 |
 
-Reported as test RMSE delta against `full`, mean ± std over seeds. A feature is
-called irrelevant only when its removal costs less than the seed spread.
-
-```
-conda run -n mybem python -m mybem.sweep features.yaml
-```
-```
-python3 scripts/metacentrum/submit.py train --exp-glob 'generated_features/*.yaml' --seeds 0 1 2
-```
-```
-conda run -n mybem python -m mybem.report --on test
-```
-
-`max_speed` stays 0. The arms without `linvel` leave `Data.speed` at `None`
-([data.py:93](../../MyBEM/mybem/data.py#L93)), so a nonzero speed cut would crash
-them in `windows()`.
-
 ## Results
 
 `--on test`, mean ± std over seeds 0/1/2. RMSE, force in N, torque in Nm. `val`
